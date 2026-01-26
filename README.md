@@ -159,9 +159,7 @@ MIT License — free for academic and commercial use.
 - [MNE-Python](https://mne.tools)
 - [MEEGKit](https://nbara.github.io/python-meegkit/)
 - [MNE-ICALabel](https://mne.tools/mne-icalabel)
-```
 
----
 
 
 
