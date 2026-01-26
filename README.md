@@ -1,4 +1,4 @@
-# XTRA EEG Preprocessing  
+# Xtra EEG Preprocessing  
 ### 
 
 **Core Philosophy: “Repair—Not Reject”**     
@@ -172,3 +172,4 @@ This version now has:
 Perfect for GitHub, lab sharing, or even supplementary material in a paper.
 
 Well done! 🎉
+
