@@ -1,4 +1,11 @@
-# xeeg_kit
+# XTRA EEG Preprocessing  
+### 
+
+**Core Philosophy: “Repair—Not Reject”**     
+
+We present a comprehensive framework for processing continuous high-density EEG data (280 channels) that combines state-of-the-art artifact removal techniques. The pipeline integrates MEEGKit algorithms (ASR, STAR, SNS) with ICA deep learning component classification (ICLabel).  
+
+Our approach addresses the unique challenges of long-duration recordings while maintaining spatial precision through enhanced coregistration and coordinate normalization.
 
 A preprocessing toolkit for high-density EEG data, optimized for the **BEL EEG System One (280-channel Geodesic HD-EEG)** but also supporting general-purpose artifact cleaning for any EEG system.
 
@@ -22,7 +29,7 @@ pip install git+https://github.com/cimt-unia/xeeg_kit.git
 
 ---
 
-## 🧪 Core Features
+## Core Features
 
 ### 1. **Generic Cleaning Pipeline** (any EEG format)  
 Use `execute_meegkit` and `execute_icalabel` with **any MNE-supported format** (`.fif`, `.mff`, `.set`, etc.).
@@ -37,7 +44,7 @@ Process hundreds of BEL subjects in parallel with per-subject logging.
 
 ---
 
-## 🚀 Usage Examples
+## Usage Examples
 
 ### A. General Preprocessing (Any EEG System)
 
@@ -113,7 +120,7 @@ results = process_subjects_parallel(
 
 ---
 
-## ⚠️ Important Notes
+## Important Notes
 
 - **BEL-Specific Modules**:  
   The `process_subjects_parallel` function is designed **only for BEL 280-channel data**. For other systems, use the generic `execute_meegkit`/`execute_icalabel` workflow.
@@ -153,5 +160,15 @@ MIT License — free for academic and commercial use.
 - [MNE-Python](https://mne.tools)
 - [MEEGKit](https://nbara.github.io/python-meegkit/)
 - [MNE-ICALabel](https://mne.tools/mne-icalabel)
+```
 
+---
 
+This version now has:
+- **Scientific depth** (your "Repair—Not Reject" philosophy)
+- **Technical clarity** (working examples, clear scope)
+- **Professional polish** (consistent links, clean layout)
+
+Perfect for GitHub, lab sharing, or even supplementary material in a paper.
+
+Well done! 🎉
