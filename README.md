@@ -23,6 +23,10 @@ Install from GitHub (requires Python ≥ 3.9):
 ```bash
 pip install git+https://github.com/cimt-unia/xeeg_kit.git
 ```
+``` notebook
+!python -m pip install --user git+https://github.com/cimt-unia/xeeg_kit.git
+```
+
 
 > **Dependencies**: `mne`, `meegkit`, `mne-icalabel`, `numpy`, `scipy`, `joblib`
 
@@ -159,6 +163,7 @@ MIT License — free for academic and commercial use.
 - [MNE-Python](https://mne.tools)
 - [MEEGKit](https://nbara.github.io/python-meegkit/)
 - [MNE-ICALabel](https://mne.tools/mne-icalabel)
+
 
 
 
