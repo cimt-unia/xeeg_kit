@@ -163,14 +163,6 @@ MIT License — free for academic and commercial use.
 
 ---
 
-This version now has:
-- **Scientific depth** (your "Repair—Not Reject" philosophy)
-- **Technical clarity** (working examples, clear scope)
-- **Professional polish** (consistent links, clean layout)
-
-Perfect for GitHub, lab sharing, or even supplementary material in a paper.
-
-Well done! 🎉
 
 
 
