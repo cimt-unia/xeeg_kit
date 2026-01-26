@@ -1,5 +1,4 @@
-# Xtra EEG Preprocessing  
-### 
+# Multi-Stage Artifact Removal
 
 **Core Philosophy: “Repair—Not Reject”**     
 
@@ -12,6 +11,7 @@ A preprocessing toolkit for high-density EEG data, optimized for the **BEL EEG S
 Built on [MNE-Python](https://mne.tools), `xeeg_kit` integrates:
 - **MEEGKit** (ASR + STAR + SNS) for robust denoising
 - **ICLabel** for automatic ICA component rejection
+- Advanced Framework for High-Density EEG Preprocessing 
 - BEL-specific utilities for channel renaming and montage handling
 - Parallel processing for batch analysis of BEL datasets
 
@@ -172,4 +172,5 @@ This version now has:
 Perfect for GitHub, lab sharing, or even supplementary material in a paper.
 
 Well done! 🎉
+
 
