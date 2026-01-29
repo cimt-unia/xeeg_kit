@@ -1,7 +1,7 @@
 # xeeg_kit/artifact_cleaning.py
-"""
-Core artifact cleaning pipelines: MEEGKit and ICLabel-based ICA.
-"""
+
+# Core artifact cleaning pipelines: MEEGKit and ICLabel-based ICA.
+
 import warnings
 import numpy as np
 from typing import Optional, Dict, Any, List, Tuple
@@ -103,6 +103,7 @@ def execute_meegkit(
 
     return raw
 
+
 def execute_icalabel(
     raw: 'mne.io.Raw',
     icalabel_thresholds: Optional[Dict[str, float]] = None,
@@ -168,14 +169,7 @@ def execute_icalabel(
         raw_eeg = raw.copy().pick("eeg")
         labels_dict = label_components(raw_eeg, ica, method="iclabel")
 
-        # >>> Log ICLabel predictions <<<
-        if verbose:
-            log("ICLabel component classifications:")
-            for i, (label, prob_vec) in enumerate(zip(labels_dict["labels"], labels_dict["y_pred_proba"])):
-                max_prob = np.max(prob_vec)
-                log(f"  C{i:02d}: {label:<18} ({max_prob:.2f})")
-        # >>> END: Log ICLabel predictions <<<
-
+        # Verbose logging
         excluded = []
         for i, (label, prob_vec) in enumerate(zip(labels_dict["labels"], labels_dict["y_pred_proba"])):
             lbl = label.lower().strip()
@@ -183,8 +177,16 @@ def execute_icalabel(
                 excluded.append(i)
 
         ica.exclude = sorted(set(excluded))
+
         if verbose:
             log(f"Excluding ICA components: {ica.exclude}")
+            if ica.exclude:
+                log("ICLabel component classifications:")
+                for i in ica.exclude:
+                    label = labels_dict["labels"][i]
+                    max_prob = np.max(labels_dict["y_pred_proba"][i])
+                    log(f"  C{i:02d}: {label:<18} ({max_prob:.2f})")
+        # END: Verbose logging
 
         cleaned = ica.apply(raw)
 
@@ -200,5 +202,5 @@ def execute_icalabel(
             log(f"Interpolated {len(bads)} originally bad channels.")
 
     return cleaned
-    
+
 
