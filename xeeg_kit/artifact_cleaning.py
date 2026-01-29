@@ -117,6 +117,9 @@ def execute_icalabel(
     Execute ICA + ICLabel automatic component rejection.
     """
     import mne
+    import numpy as np
+    from warnings import catch_warnings, filterwarnings
+
     if icalabel_thresholds is None:
         icalabel_thresholds = {
             'eye blink': 0.70,
@@ -147,8 +150,8 @@ def execute_icalabel(
     try:
         if verbose:
             log("Fitting ICA...")
-        with warnings.catch_warnings():
-            warnings.filterwarnings('ignore')
+        with catch_warnings():
+            filterwarnings('ignore')
             ica = mne.preprocessing.ICA(
                 n_components=n_components,
                 method='picard',
@@ -164,6 +167,14 @@ def execute_icalabel(
             log("Running ICLabel...")
         raw_eeg = raw.copy().pick("eeg")
         labels_dict = label_components(raw_eeg, ica, method="iclabel")
+
+        # >>> Log ICLabel predictions <<<
+        if verbose:
+            log("ICLabel component classifications:")
+            for i, (label, prob_vec) in enumerate(zip(labels_dict["labels"], labels_dict["y_pred_proba"])):
+                max_prob = np.max(prob_vec)
+                log(f"  C{i:02d}: {label:<18} ({max_prob:.2f})")
+        # >>> END: Log ICLabel predictions <<<
 
         excluded = []
         for i, (label, prob_vec) in enumerate(zip(labels_dict["labels"], labels_dict["y_pred_proba"])):
@@ -189,3 +200,5 @@ def execute_icalabel(
             log(f"Interpolated {len(bads)} originally bad channels.")
 
     return cleaned
+    
+
