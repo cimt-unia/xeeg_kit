@@ -56,7 +56,8 @@ import mne
 from xeeg_kit import execute_meegkit, execute_icalabel
 
 # Load data (EGI .mff, FIF, Brainstorm, etc.)
-raw = mne.io.read_raw_egi("subject.mff", preload=True)
+raw = mne.io.read_raw_egi("subject.mff", preload=True)   # MFF
+raw = mne.io.read_raw_fif("subject.fif", preload=True)   # FIF
 
 # Optional: Standardize for BEL 280 (if needed)
 from xeeg_kit import bel_280
@@ -163,6 +164,7 @@ MIT License — free for academic and commercial use.
 - [MNE-Python](https://mne.tools)
 - [MEEGKit](https://nbara.github.io/python-meegkit/)
 - [MNE-ICALabel](https://mne.tools/mne-icalabel)
+
 
 
 
