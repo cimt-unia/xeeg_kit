@@ -3,15 +3,12 @@
 General-purpose utilities shared across modules.
 """
 import time
-import os
-from typing import List, Tuple, Dict, Any
+from typing import List, Tuple, Optional
 import numpy as np
 from scipy.stats import median_abs_deviation
-from pathlib import Path
 
 
-def _log(msg: str, subject_id: Optional[str] = None):
-    """Internal logger with optional subject prefix."""
+def log(msg: str, subject_id: Optional[str] = None):
     timestamp = time.strftime("%H:%M:%S")
     if subject_id:
         print(f"[{timestamp}] [{subject_id}] {msg}")
@@ -51,7 +48,6 @@ def find_cleanest_segment(
     start_sec: float = 0.0
 ) -> Tuple[np.ndarray, float]:
     """Find the cleanest continuous segment for ASR calibration."""
-    from .utils import log  # Avoid circular import; or keep log here
     sfreq = raw.info["sfreq"]
     duration_samp = int(duration_sec * sfreq)
     step_samp = int(step_sec * sfreq)
@@ -106,6 +102,7 @@ def find_cleanest_segment(
     start_time = best_start / sfreq
     log(f"✅ Cleanest segment at t={start_time:.1f}s (score={score[best_idx]:.2f})")
     return calib_data_v, start_time
+
 
 
 
