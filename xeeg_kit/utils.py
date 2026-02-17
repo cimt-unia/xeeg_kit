@@ -9,10 +9,6 @@ import numpy as np
 from scipy.stats import median_abs_deviation
 from pathlib import Path
 
-def log(msg: str):
-    """Log a message to stdout with timestamp."""
-    timestamp = time.strftime("%H:%M:%S")
-    print(f"[{timestamp}] {msg}")
 
 
 def detect_bad_channels(
@@ -102,4 +98,5 @@ def find_cleanest_segment(
     start_time = best_start / sfreq
     log(f"✅ Cleanest segment at t={start_time:.1f}s (score={score[best_idx]:.2f})")
     return calib_data_v, start_time
+
 
