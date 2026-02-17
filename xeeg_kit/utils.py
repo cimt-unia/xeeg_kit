@@ -14,48 +14,6 @@ def log(msg: str):
     timestamp = time.strftime("%H:%M:%S")
     print(f"[{timestamp}] {msg}")
 
-def verify_parallel_config() -> Dict[str, Any]:
-    """
-    Verify that parallel processing configuration is optimal.
-    
-    Returns
-    -------
-    dict
-        Configuration status and recommendations
-    """
-    config = {
-        'blas_threads_limited': False,
-        'warnings': [],
-        'recommendations': []
-    }
-    
-    thread_vars = ["OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", 
-                   "MKL_NUM_THREADS", "VECLIB_MAXIMUM_THREADS"]
-    
-    limited = all(os.environ.get(var) == "1" for var in thread_vars)
-    config['blas_threads_limited'] = limited
-    
-    if not limited:
-        config['warnings'].append(
-            "⚠️  BLAS threading not limited! This will cause severe slowdown "
-            "when running ICA in parallel. Add this at the TOP of your script:\n"
-            "  import os\n"
-            "  os.environ['OMP_NUM_THREADS'] = '1'\n"
-            "  os.environ['OPENBLAS_NUM_THREADS'] = '1'\n"
-            "  os.environ['MKL_NUM_THREADS'] = '1'"
-        )
-    
-    try:
-        import multiprocessing
-        n_cpus = multiprocessing.cpu_count()
-        config['n_cpus'] = n_cpus
-        config['recommendations'].append(
-            f"✅ Detected {n_cpus} CPU cores. Use n_jobs=-1 to utilize all cores."
-        )
-    except Exception:
-        pass
-    
-    return config
 
 def detect_bad_channels(
     raw: 'mne.io.Raw',
@@ -144,3 +102,4 @@ def find_cleanest_segment(
     start_time = best_start / sfreq
     log(f"✅ Cleanest segment at t={start_time:.1f}s (score={score[best_idx]:.2f})")
     return calib_data_v, start_time
+
