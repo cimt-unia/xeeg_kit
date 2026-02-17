@@ -10,6 +10,14 @@ from scipy.stats import median_abs_deviation
 from pathlib import Path
 
 
+def _log(msg: str, subject_id: Optional[str] = None):
+    """Internal logger with optional subject prefix."""
+    timestamp = time.strftime("%H:%M:%S")
+    if subject_id:
+        print(f"[{timestamp}] [{subject_id}] {msg}")
+    else:
+        print(f"[{timestamp}] {msg}")
+
 
 def detect_bad_channels(
     raw: 'mne.io.Raw',
@@ -98,5 +106,6 @@ def find_cleanest_segment(
     start_time = best_start / sfreq
     log(f"✅ Cleanest segment at t={start_time:.1f}s (score={score[best_idx]:.2f})")
     return calib_data_v, start_time
+
 
 
