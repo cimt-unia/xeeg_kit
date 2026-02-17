@@ -78,11 +78,11 @@ def execute_meegkit(
 
     with warnings.catch_warnings():
         warnings.filterwarnings('ignore')
-        denoised_t_ch, _, _ = star.star(cleaned_good.T, thresh=star_thresh, verbose=False)
+        denoised_t_ch, _, _ = star(cleaned_good.T, thresh=star_thresh, verbose=False)
     cleaned_good = denoised_t_ch.T
 
     try:
-        denoised_t_ch, _ = sns.sns(cleaned_good.T, n_neighbors=sns_neighbors)
+        denoised_t_ch, _ = sns(cleaned_good.T, n_neighbors=sns_neighbors)
         cleaned_good = denoised_t_ch.T
         if verbose:
             log("SNS applied successfully.")
@@ -202,6 +202,7 @@ def execute_icalabel(
             log(f"Interpolated {len(bads)} originally bad channels.")
 
     return cleaned
+
 
 
 
