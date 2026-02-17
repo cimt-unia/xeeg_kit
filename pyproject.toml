@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=77.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -7,7 +7,7 @@ name = "xeeg_kit"
 version = "0.1.0"
 description = "Preprocessing toolkit for BEL EEG System One (280-channel HD-EEG)"
 readme = "README.md"
-license = {text = "MIT"}
+license = "MIT"
 requires-python = ">=3.9"
 dependencies = [
     "mne>=1.4",
@@ -17,3 +17,6 @@ dependencies = [
     "scipy",
     "joblib"
 ]
+
+[tool.setuptools.packages.find]
+include = ["xeeg_kit*"]   # only package xeeg_kit/, exclude notebooks/ and anything else
