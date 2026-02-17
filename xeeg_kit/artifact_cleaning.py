@@ -5,7 +5,7 @@
 import warnings
 import numpy as np
 from typing import Optional, Dict, Any, List, Tuple
-from meegkit import asr, star, sns
+from ._meegkit_vendored import asr, star, sns
 from mne_icalabel import label_components
 from .utils import log, detect_bad_channels, find_cleanest_segment
 
@@ -202,5 +202,6 @@ def execute_icalabel(
             log(f"Interpolated {len(bads)} originally bad channels.")
 
     return cleaned
+
 
 
