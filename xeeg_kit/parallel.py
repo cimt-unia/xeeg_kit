@@ -20,18 +20,9 @@ import time
 from pathlib import Path
 from typing import Optional, Dict, Any, List, Union, Callable
 from joblib import Parallel, delayed
+from .utils import log  # Unified logger from utils.py
 from .artifact_cleaning import execute_meegkit, execute_icalabel
 from .bel_280 import BELStandardizer
-
-
-
-def _log(msg: str, subject_id: Optional[str] = None):
-    """Internal logger with optional subject prefix."""
-    timestamp = time.strftime("%H:%M:%S")
-    if subject_id:
-        print(f"[{timestamp}] [{subject_id}] {msg}")
-    else:
-        print(f"[{timestamp}] {msg}")
 
 
 def verify_parallel_config() -> Dict[str, Any]:
@@ -121,7 +112,6 @@ def process_single_subject(
     (e.g. when workers race on the same subject directory).
     """
 
-
     local_logs = []
 
     def capture_log(msg: str):
@@ -142,7 +132,8 @@ def process_single_subject(
     }
 
     try:
-        _log(f"Loading data from {Path(input_file).name}", subject_id)
+        # CHANGED: _log → log
+        log(f"Loading data from {Path(input_file).name}", subject_id)
         raw = mne.io.read_raw(input_file, preload=True, verbose=False)
 
         # Apply BEL standardization if needed
@@ -151,11 +142,13 @@ def process_single_subject(
             raw = standardizer.standardize(raw)
 
         if run_meegkit:
-            _log("Running MEEGKit cleaning...", subject_id)
+            # CHANGED: _log → log
+            log("Running MEEGKit cleaning...", subject_id)
             raw = execute_meegkit(raw, **(meegkit_params or {}))
 
         if run_icalabel:
-            _log("Running ICA + ICLabel...", subject_id)
+            # CHANGED: _log → log
+            log("Running ICA + ICLabel...", subject_id)
             raw = execute_icalabel(raw, **(icalabel_params or {}))
 
         output_path = Path(output_file)
@@ -164,13 +157,15 @@ def process_single_subject(
 
         result['success'] = True
         result['processing_time'] = time.time() - start_time
-        _log(f"✅ Completed in {result['processing_time']:.1f}s → {output_path.name}", subject_id)
+        # CHANGED: _log → log
+        log(f"✅ Completed in {result['processing_time']:.1f}s → {output_path.name}", subject_id)
 
     except Exception as e:
         error_msg = str(e)
         result['error'] = error_msg
         result['processing_time'] = time.time() - start_time
-        _log(f"❌ Failed: {error_msg[:100]}", subject_id)
+        # CHANGED: _log → log
+        log(f"❌ Failed: {error_msg[:100]}", subject_id)
 
     finally:
         output_path = Path(output_file)
@@ -211,13 +206,14 @@ def process_subjects_parallel(
     if verify_config and verbose:
         config = verify_parallel_config()
         if config['warnings']:
-            _log("\n" + "=" * 60)
-            _log("⚠️  PARALLEL CONFIGURATION WARNING")
-            _log("=" * 60)
+            # CHANGED: _log → log
+            log("\n" + "=" * 60)
+            log("⚠️  PARALLEL CONFIGURATION WARNING")
+            log("=" * 60)
             for warning in config['warnings']:
-                _log(warning)
-            _log("\nContinuing anyway, but performance will be suboptimal...")
-            _log("=" * 60 + "\n")
+                log(warning)
+            log("\nContinuing anyway, but performance will be suboptimal...")
+            log("=" * 60 + "\n")
 
     if subject_ids is None:
         subject_ids = []
@@ -275,9 +271,10 @@ def process_subjects_parallel(
             )
 
     if verbose:
-        _log(f"Processing {len(input_files)} subjects with n_jobs={n_jobs}")
-        _log(f"Output directory: {output_dir}")
-        _log(f"Output structure: {output_structure}")
+        # CHANGED: _log → log
+        log(f"Processing {len(input_files)} subjects with n_jobs={n_jobs}")
+        log(f"Output directory: {output_dir}")
+        log(f"Output structure: {output_structure}")
 
     results = Parallel(n_jobs=n_jobs, backend='loky', verbose=10 if verbose else 0)(
         delayed(process_single_subject)(
@@ -301,15 +298,17 @@ def process_subjects_parallel(
         total_time = sum(r['processing_time'] for r in results)
         avg_time = total_time / len(results) if results else 0
 
-        _log("\n" + "=" * 60)
-        _log(f"SUMMARY: {len(successful)}/{len(results)} subjects processed successfully")
-        _log(f"Average processing time: {avg_time:.1f}s per subject")
-        _log(f"Total wall time: {max(r['processing_time'] for r in results):.1f}s")
+        # CHANGED: _log → log
+        log("\n" + "=" * 60)
+        log(f"SUMMARY: {len(successful)}/{len(results)} subjects processed successfully")
+        log(f"Average processing time: {avg_time:.1f}s per subject")
+        log(f"Total wall time: {max(r['processing_time'] for r in results):.1f}s")
 
         if failed:
-            _log(f"\n❌ Failed subjects ({len(failed)}):")
+            log(f"\n❌ Failed subjects ({len(failed)}):")
             for r in failed:
-                _log(f"  - {r['subject_id']}: {r['error'][:80]}")
-        _log("=" * 60)
+                log(f"  - {r['subject_id']}: {r['error'][:80]}")
+        log("=" * 60)
 
     return results
+
