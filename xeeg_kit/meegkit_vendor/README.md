@@ -9,6 +9,7 @@ This document provides an in-depth, mathematically grounded explanation of the a
 2. **STAR:** Fix random, isolated electrode pops using global spatial correlation.
 3. **SNS:** Apply a final continuous spatial filter to suppress baseline thermal hiss across all channels.
 
+<br>
 
 ## **Summary Table**
 
