@@ -65,7 +65,7 @@ ASR operates on **multivariate time windows**. It assumes genuine EEG has a stab
 | `estimator` | `'oas'` | Covariance estimator. **OAS** is used because it provides a robust, regularized estimate even when the number of channels approaches the number of samples, preventing singular matrices. |
 | `win_len` | `0.5` | Window length in seconds. Should be roughly the duration of the artifacts you want to catch (e.g., a blink is ~0.3-0.5s). |
 
----
+<br>
 
 <br>
 
@@ -95,7 +95,7 @@ STAR operates **sample-by-sample** and **channel-by-channel**. It relies on spat
 | `n_iter` | `3` | Number of iterations to refine the clean covariance matrix `C0`. More iterations yield a more robust baseline but increase computation time. |
 | `depth` | `1` | Maximum number of channels to fix at each sample. Keeping this at `1` ensures STAR only fixes the *most* eccentric channel at any given millisecond, preventing cascading over-correction. |
 
----
+<br>
 
 <br>
 
@@ -124,7 +124,7 @@ Unlike spherical spline interpolation (which uses *physical distance* to fix dea
 
 <br>
 
----
+<br>
 
 ## **How `xeegkit` Orchestrates This (`execute_meegkit`)**
 
@@ -137,4 +137,4 @@ The `execute_meegkit` function wraps these algorithms in a robust, production-re
 5. **The Cleaning Chain:** Executes `ASR.transform` → `star` → `sns` sequentially on the good channels.
 6. **Reconstruction:** Injects the cleaned good-channel data back into the original `Raw` object. Finally, it uses MNE's spherical spline interpolation to reconstruct the originally detected bad channels, leveraging the now-pristine spatial topology of the cleaned good channels.
 
-This sequential, mathematically rigorous approach ensures that high-density EEG data is cleansed of both macroscopic artifacts and microscopic sensor noise while preserving the underlying neural topography.
+
