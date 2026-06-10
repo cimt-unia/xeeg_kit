@@ -59,6 +59,9 @@ ASR operates on **multivariate time windows**. It assumes genuine EEG has a stab
 
 * **ASR Action:** ASR computes the covariance of `X`. The first principal component (aligned with `C3`) has a variance of **2500**. Because `2500 > 18`, ASR flags this spatial direction as an artifact. It constructs a projection matrix that zeroes out the `C3` direction. The value `50` is replaced by a value consistent with the clean correlation of `C1` and `C2` (e.g., `2.1`).
 
+  <Figure size 2400x1200 with 2 Axes><img width="2058" height="1167" alt="image" src="https://github.com/user-attachments/assets/f572ade1-f26a-4f04-8a6e-620978b0ec19" />
+
+
 ### ⚙️ **Key Parameters & Tuning (`xeegkit` defaults)**
 | Parameter | Default | Description & Tuning Guide |
 | :--- | :--- | :--- |
@@ -89,6 +92,9 @@ STAR operates **sample-by-sample** and **channel-by-channel**. It relies on spat
 * **STAR Action:** STAR predicts what `C3` should be: `C3_pred = 0.5(2) + 0.2(4) = 1.8`.
 * **Decision:** The residual error is `|100 - 1.8| = 98.2`. This vastly exceeds the threshold (e.g., 2.5). STAR surgically replaces the `100` with `1.8`, leaving `C1` and `C2` completely untouched.
 
+  <Figure size 2100x1500 with 2 Axes><img width="2067" height="1467" alt="image" src="https://github.com/user-attachments/assets/7b6b2f88-77d8-46cf-8cbe-b630768d5a4c" />
+
+
 ### ⚙️ **Key Parameters & Tuning (`xeegkit` defaults)**
 | Parameter | Default | Description & Tuning Guide |
 | :--- | :--- | :--- |
@@ -117,6 +123,9 @@ Unlike spherical spline interpolation (which uses *physical distance* to fix dea
 * **Measured Data:** `C1 = 7 µV`, `C2 = 4 µV`.
 * **SNS Action:** To clean `C1`, SNS regresses it onto `C2`. The regression mathematically extracts the shared component (`5 µV`) and discards the independent component (`+2 µV`). The output for `C1` is pulled away from `7` and pushed back toward the true signal of `5`.
 
+  <Figure size 2100x1200 with 1 Axes><img width="2067" height="1167" alt="image" src="https://github.com/user-attachments/assets/16468b9a-ed8a-4723-aae7-cfc7bf315fc3" />
+
+
 ### ⚙️ **Key Parameters & Tuning (`xeegkit` defaults)**
 | Parameter | Default | Description & Tuning Guide |
 | :--- | :--- | :--- |
@@ -138,4 +147,5 @@ The `execute_meegkit` function wraps these algorithms in a robust, production-re
 5. **The Cleaning Chain:** Executes `ASR.transform` → `star` → `sns` sequentially on the good channels.
 6. **Reconstruction:** Injects the cleaned good-channel data back into the original `Raw` object. Finally, it uses MNE's spherical spline interpolation to reconstruct the originally detected bad channels, leveraging the now-pristine spatial topology of the cleaned good channels.
 
+<Figure size 2100x1500 with 1 Axes><img width="2067" height="1467" alt="image" src="https://github.com/user-attachments/assets/d78e7008-621d-4c91-80f5-287db7ccd575" />
 
