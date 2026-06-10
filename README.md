@@ -73,7 +73,7 @@ raw.set_montage(montage, on_missing="warn")
 clean_1 = execute_meegkit(
     raw,
     low_pass_filter=100.0,
-    notch_filter_freq=60.0,
+    notch_filter_freq=60.0,  # 50 in Europe
     verbose=True
 )
 
@@ -94,15 +94,15 @@ output_dir = "cleaned_data/"
 # Define cleaning parameters
 meegkit_params = {
     'low_pass_filter': 100.0,
-    'notch_filter_freq': 60.0,
-    'mad_threshold': 4.5,
+    'notch_filter_freq': 60.0,  # 50 in Europe
+    'mad_threshold': 15.0,            
     'asr_cutoff': 3.0,
     'star_thresh': 2.0,
     'sns_neighbors': 8
 }
 
 icalabel_params = {
-    'mad_threshold': 10.0,
+    'mad_threshold': 20.0,
     'n_components': 0.98,
     'random_state': 97
 }
