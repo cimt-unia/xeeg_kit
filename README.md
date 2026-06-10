@@ -96,8 +96,8 @@ meegkit_params = {
     'low_pass_filter': 100.0,
     'notch_filter_freq': 60.0,  # 50 in Europe
     'mad_threshold': 15.0,            
-    'asr_cutoff': 3.0,
-    'star_thresh': 2.0,
+    'asr_cutoff': 3.5,
+    'star_thresh': 2.5,
     'sns_neighbors': 8
 }
 
