@@ -13,7 +13,7 @@ def execute_meegkit(
     raw: 'mne.io.Raw',
     low_pass_filter: Optional[float] = 100.0,
     notch_filter_freq: float = 60.0,
-    mad_threshold: float = 10.0,
+    mad_threshold: float = 15.0,
     min_amplitude_uv: float = 0.1,
     asr_cutoff: float = 3.0,
     star_thresh: float = 2.5,
@@ -117,7 +117,7 @@ def execute_meegkit(
 def execute_icalabel(
     raw: 'mne.io.Raw',
     icalabel_thresholds: Optional[Dict[str, float]] = None,
-    mad_threshold: float = 15.0,
+    mad_threshold: float = 20.0,
     min_amplitude_uv: float = 0.1,
     n_components: Any = 0.99,
     random_state: int = 99,
