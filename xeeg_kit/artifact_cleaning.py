@@ -33,8 +33,6 @@ def execute_meegkit(
     if verbose:
         log("Starting MEEGKit cleaning pipeline...")
 
-
-
     raw = raw.copy().load_data()
     raw.filter(l_freq=1.0, h_freq=low_pass_filter, picks='eeg', n_jobs=1, verbose=False)
 
@@ -45,8 +43,6 @@ def execute_meegkit(
     
     raw.notch_filter(freqs=notch_filter_freq, picks='eeg', method='spectrum_fit',
                      filter_length='auto', mt_bandwidth=1.0, p_value=0.05, n_jobs=1, verbose=False)
-
-    
 
     raw._data = np.real(raw._data).astype(np.float64)
 
@@ -64,6 +60,9 @@ def execute_meegkit(
     if len(good_idx) == 0:
         raise ValueError("No good EEG channels found after bad channel detection.")
     
+
+    raw.set_eeg_reference('average', projection=False, verbose=False)
+    
     good_ch_names = [raw.ch_names[i] for i in good_idx]
     data_good = raw.get_data(picks=good_idx)
 
@@ -71,9 +70,9 @@ def execute_meegkit(
     raw_good = mne.io.RawArray(data_good, info_good, verbose=False)
     if raw.get_montage() is not None:
         raw_good.set_montage(raw.get_montage(), on_missing='ignore')
-    raw_good.set_eeg_reference('average', verbose=False)
+    
     if verbose:
-        log("CAR applied on good E-channels only.")
+        log("CAR applied in-place to good E-channels.")
 
     calib_data, _ = find_cleanest_segment(
         raw_good, 
@@ -81,6 +80,7 @@ def execute_meegkit(
         duration_sec=find_cleanest_segment_duration
     )
     calib_data = np.real(calib_data).astype(np.float64)
+    
     asr_model = asr.ASR(sfreq=raw_good.info['sfreq'], cutoff=asr_cutoff, estimator='oas')
     asr_model.fit(calib_data)
     cleaned_good = asr_model.transform(data_good)
@@ -113,7 +113,6 @@ def execute_meegkit(
 
     return raw
 
-
 def execute_icalabel(
     raw: 'mne.io.Raw',
     icalabel_thresholds: Optional[Dict[str, float]] = None,
@@ -133,11 +132,11 @@ def execute_icalabel(
 
     if icalabel_thresholds is None:
         icalabel_thresholds = {
-            'eye blink': 0.70,
-            'heart beat': 0.70,
-            'muscle artifact': 0.70,
-            'line noise': 0.70,
-            'channel noise': 0.70
+            'eye blink': 0.75,
+            'heart beat': 0.75,
+            'muscle artifact': 0.75,
+            'line noise': 0.75,
+            'channel noise': 0.75
         }
 
     if verbose:
@@ -151,9 +150,10 @@ def execute_icalabel(
     if verbose:
         log(f"Detected {len(bads)} bad channels.")
 
-    raw.set_eeg_reference('average', verbose=False)
+    # CRITICAL FIX: Use projection=False to physically center data for ICA
+    raw.set_eeg_reference('average', projection=False, verbose=False)
     if verbose:
-        log("Re-applied average reference.")
+        log("Re-applied average reference (in-place).")
 
     if raw.info['highpass'] > 1.0:
         raise ValueError("Data must be high-pass filtered at ≤1 Hz before ICA.")
@@ -179,7 +179,6 @@ def execute_icalabel(
         raw_eeg = raw.copy().pick("eeg")
         labels_dict = label_components(raw_eeg, ica, method="iclabel")
 
-        # Verbose logging
         excluded = []
         for i, (label, prob_vec) in enumerate(zip(labels_dict["labels"], labels_dict["y_pred_proba"])):
             lbl = label.lower().strip()
@@ -196,7 +195,6 @@ def execute_icalabel(
                     label = labels_dict["labels"][i]
                     max_prob = np.max(labels_dict["y_pred_proba"][i])
                     log(f"  C{i:02d}: {label:<18} ({max_prob:.2f})")
-        # END: Verbose logging
 
         cleaned = ica.apply(raw)
 
@@ -212,12 +210,14 @@ def execute_icalabel(
             log(f"Interpolated {len(bads)} originally bad channels.")
             
         # CRITICAL: Restore the zero-sum constraint after adding new channels
-        cleaned.set_eeg_reference('average', verbose=False)
+        cleaned.set_eeg_reference('average', projection=False, verbose=False)
         if verbose:
             log("Re-applied average reference to restore zero-sum constraint after interpolation.")
 
-
     return cleaned
+
+
+
 
 
 
