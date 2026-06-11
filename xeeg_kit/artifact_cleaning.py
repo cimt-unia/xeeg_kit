@@ -210,6 +210,12 @@ def execute_icalabel(
         cleaned.interpolate_bads(reset_bads=True)
         if verbose:
             log(f"Interpolated {len(bads)} originally bad channels.")
+            
+        # CRITICAL: Restore the zero-sum constraint after adding new channels
+        cleaned.set_eeg_reference('average', verbose=False)
+        if verbose:
+            log("Re-applied average reference to restore zero-sum constraint after interpolation.")
+
 
     return cleaned
 
