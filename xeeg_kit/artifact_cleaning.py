@@ -36,14 +36,17 @@ def execute_meegkit(
     raw = raw.copy().load_data()
     raw.filter(l_freq=1.0, h_freq=low_pass_filter, picks='eeg', n_jobs=1, verbose=False)
 
-    # Expand fundamental to [f0, 2*f0], clipped to valid band
-    f0 = float(notch_filter_freq)
-    max_f = min(low_pass_filter or np.inf, raw.info['sfreq']/2)
-    notch_filter_freq = [f for f in [f0, f0*2] if f <= max_f]
-    
-    raw.notch_filter(freqs=notch_filter_freq, picks='eeg', method='spectrum_fit',
-                     filter_length='auto', mt_bandwidth=1.0, p_value=0.05, n_jobs=1, verbose=False)
 
+    # NOTCH FILTER
+    if notch_filter_freq is not None:
+        f0 = float(notch_filter_freq)
+        max_f = min(low_pass_filter or np.inf, raw.info['sfreq']/2)
+        notch_filter_freqs = [f for f in [f0, f0*2] if f <= max_f]
+        
+        if notch_filter_freqs:
+            raw.notch_filter(freqs=notch_filter_freqs, picks='eeg', method='fir',
+                             filter_length='auto', n_jobs=1, verbose=False)
+    
     raw._data = np.real(raw._data).astype(np.float64)
 
     if drop_cz and 'Cz' in raw.ch_names:
