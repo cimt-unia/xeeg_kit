@@ -24,10 +24,11 @@ logging.basicConfig(
 # ------------------------------------------------------------------------------
 # 2. DIRECTORY CONFIGURATION
 # ------------------------------------------------------------------------------
-# Define input and output paths. The pipeline expects a BIDS-like structure.
+# Define input and output paths. The pipeline expects a flat input directory
+# with all FIF files at the root level (non-recursive discovery).
 # Input files must be .fif format and match the glob pattern defined below.
-DATA_DIR = Path("/path/to/derivatives/study_name/eeg")
-OUTPUT_DIR = Path("/path/to/derivatives/study_name/eeg/clean")
+DATA_DIR = Path("/path/to/data")
+OUTPUT_DIR = Path("/path/to/output")
 
 # ------------------------------------------------------------------------------
 # 3. MEEGKIT STAGE PARAMETERS (Initial Cleaning)
@@ -56,8 +57,9 @@ MEEGKIT_PARAMS = {
     # REPORTING
     "verbose": True,             # Enable stage-level logging
     "generate_report": True,     # Create interactive 3D HTML bad channel map
-    "report_dir": OUTPUT_DIR,    # Save reports to output directory
-    "subject_id": "sub-01_meegkit",  # Unique ID prevents report collisions
+    # NOTE: Do NOT set report_dir or subject_id here.
+    # The pipeline manages these automatically to prevent collisions.
+    # Reports are saved to output_dir/reports/ with auto-generated filenames.
 }
 
 # ------------------------------------------------------------------------------
@@ -78,22 +80,21 @@ ICALABEL_PARAMS = {
     "interpolate_bads": True,    # Interpolate residual bads found here
     "verbose": True,             # Log ICA fitting and component exclusion
     "generate_report": True,     # Second HTML report for ICLabel residuals
-    "report_dir": OUTPUT_DIR,    # Same directory as MEEGKit reports
-    "subject_id": "sub-01_icalabel",  # Distinct suffix avoids overwriting
+    # NOTE: Do NOT set report_dir or subject_id here.
+    # The pipeline manages these automatically to prevent collisions.
 }
 
 # ------------------------------------------------------------------------------
 # 5. EXECUTE PIPELINE
 # ------------------------------------------------------------------------------
-# Run the sequential batch processor. Returns a dict mapping input paths
+# Run the sequential batch processor. Returns a dict mapping input filenames
 # to their corresponding cleaned output paths.
 saved_paths = preprocess_bel_trials(
     data_dir=DATA_DIR,
     output_dir=OUTPUT_DIR,
     meegkit_params=MEEGKIT_PARAMS,
     icalabel_params=ICALABEL_PARAMS,
-    pattern="*_eeg_raw.fif",     # Glob pattern for file discovery
-    recursive=True,              # Search subdirectories (preserves structure)
+    pattern="*_eeg_raw.fif",     # Glob pattern for file discovery (non-recursive)
     overwrite=True,              # Replace existing outputs without prompting
     verbose=True                 # Log top-level file iteration
 )
@@ -103,8 +104,26 @@ saved_paths = preprocess_bel_trials(
 # ------------------------------------------------------------------------------
 logging.info("EEG processing complete: %d files cleaned", len(saved_paths))
 
-# NOTE FOR PRODUCTION BATCHES:
-# The subject_id above is hardcoded for tutorial clarity. When processing
-# multiple subjects, extract IDs dynamically from filenames to prevent
-# all reports from overwriting each other. Example:
-#   subject_id = filepath.stem.split("_")[0] + "_meegkit"
+# ------------------------------------------------------------------------------
+# 7. OUTPUT STRUCTURE EXPLANATION
+# ------------------------------------------------------------------------------
+# The pipeline creates a flat output directory with a dedicated reports folder:
+#
+# output_dir/
+# ├── DP02_gain_eeg_raw_eeg.fif          # Cleaned continuous data
+# ├── DP02_loss_eeg_raw_eeg.fif
+# └── reports/
+#     ├── DP02_meegkit_bad_channels_3d.html    # MEEGKit-stage QA report
+#     └── DP02_icalabel_bad_channels_3d.html   # ICLabel-stage QA report
+#
+# KEY CHANGES FROM PREVIOUS VERSIONS:
+# - Pipeline now manages report_dir and subject_id automatically
+# - Non-recursive file discovery (no subdirectory traversal)
+# - Flat output structure with reports/ subdirectory
+# - Output files use _eeg suffix instead of _proc
+# - recursive parameter has been removed from the API
+
+# NOTE ABOUT MISSING REPORTS:
+# When no bad channels are detected in a stage, the corresponding HTML
+# report is not generated. Fewer report files than expected is normal
+# and indicates clean data.
