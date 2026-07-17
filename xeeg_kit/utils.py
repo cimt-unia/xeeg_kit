@@ -102,4 +102,18 @@ def find_cleanest_segment(
     return calib_data_v, start_time
 
 
+def get_resource_path(filename: str) -> Path:
+    try:
+        return importlib.resources.files('xeeg_kit.data').joinpath(filename)
+    except Exception:
+        try:
+            import pkg_resources
+            return Path(pkg_resources.resource_filename('xeeg_kit', f'data/{filename}'))
+        except Exception:
+            return Path(__file__).parent / 'data' / filename
 
+
+def get_default_gpsc_path() -> Path:
+    return get_resource_path('ghw280_from_egig.gpsc')
+
+generate_bel_channel_map = load_bel_channel_map
