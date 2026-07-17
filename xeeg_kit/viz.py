@@ -9,9 +9,11 @@ import numpy as np
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-import importlib.resources
+from .utils import get_resource_path
 
 logger = logging.getLogger(__name__)
+
+
 
 REGION_COLORS: Dict[str, str] = {
     'Prefrontal': '#FF0000', 'Fronto-Temporal': '#FFA500',
@@ -25,25 +27,13 @@ CAMERA_EYE = dict(x=1.5, y=-1.5, z=0.5)
 MARKER_SIZE_GOOD = 4
 MARKER_SIZE_BAD = 12
 
-def get_resource_path(filename: str) -> Path:
-    try:
-        return importlib.resources.files('xeeg_kit.data').joinpath(filename)
-    except Exception:
-        try:
-            import pkg_resources
-            return Path(pkg_resources.resource_filename('xeeg_kit', f'data/{filename}'))
-        except Exception:
-            return Path(__file__).parent / 'data' / filename
 
 def load_bel_channel_map() -> pd.DataFrame:
     csv_path = get_resource_path('bel_280_channel_map.csv')
     logger.debug("Loading bundled channel map from: %s", csv_path)
     return pd.read_csv(str(csv_path))
 
-def get_default_gpsc_path() -> Path:
-    return get_resource_path('ghw280_from_egig.gpsc')
 
-generate_bel_channel_map = load_bel_channel_map
 
 def get_bel_rename_map(raw: mne.io.Raw) -> Dict[str, str]:
     first_ch = raw.ch_names[0]
