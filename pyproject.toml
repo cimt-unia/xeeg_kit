@@ -1,11 +1,13 @@
 # pyproject.toml
+
+# Build configuration and dependency manifest for xeeg_kit.
 [build-system]
 requires = ["setuptools>=77.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "xeeg_kit"
-version = "0.1.0"
+version = "0.2.0"
 description = "Preprocessing toolkit for BEL EEG System One (280-channel HD-EEG)"
 readme = "README.md"
 license = "MIT"
@@ -16,15 +18,15 @@ dependencies = [
     "numpy>=1.20",
     "scipy",
     "joblib",
-    "statsmodels",          # Required for mad() in clean_windows
-    "pyriemann>=0.7",       # Optional — omit if you don't use rASR
-    "plotly",               # 3D visualizations in viz.py
-    "pandas"                # Channel mapping and analysis
+    "statsmodels",
+    "pyriemann>=0.7",
+    "plotly",
+    "pandas",
+    "matplotlib",
 ]
 
 [tool.setuptools.packages.find]
 include = ["xeeg_kit*"]
 
-# DATA FILES
 [tool.setuptools.package-data]
 "xeeg_kit" = ["data/*.gpsc", "data/*.csv"]
