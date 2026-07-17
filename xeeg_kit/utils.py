@@ -1,7 +1,9 @@
 # xeeg_kit/utils.py
 
 # General-purpose utilities and mathematical helpers for EEG processing.
+import importlib
 import logging
+from pathlib import Path
 from typing import List, Tuple
 import numpy as np
 from scipy.stats import median_abs_deviation
@@ -15,10 +17,11 @@ DEFAULT_CLEANEST_DURATION = 30.0
 DEFAULT_CLEANEST_STEP = 2.0
 DEFAULT_CLEANEST_START = 0.0
 
+
 def detect_bad_channels(
     raw: mne.io.Raw,
     mad_threshold: float = DEFAULT_MAD_THRESHOLD,
-    min_amplitude_uv: float = DEFAULT_MIN_AMPLITUDE_UV
+    min_amplitude_uv: float = DEFAULT_MIN_AMP_UV
 ) -> List[str]:
     raw_eeg = raw.copy().pick("eeg")
     data_uv = raw_eeg.get_data() * 1e6
@@ -34,9 +37,10 @@ def detect_bad_channels(
         if not np.isnan(mad) and mad > 1e-12:
             z = (feat - np.nanmedian(feat)) / mad
             noisy_mask |= z > mad_threshold
-            
+
     noisy_chs = [ch for ch, is_noisy in zip(raw_eeg.ch_names, noisy_mask) if is_noisy]
     return sorted(set(flat_chs + noisy_chs))
+
 
 def find_cleanest_segment(
     raw: mne.io.Raw,
@@ -97,7 +101,7 @@ def find_cleanest_segment(
     best_start = best_idx * step_samp + start_samp
     calib_data_v = data_v[:, best_start:best_start + duration_samp]
     start_time = best_start / sfreq
-    
+
     logger.info("Cleanest segment at t=%.1fs (score=%.2f)", start_time, score[best_idx])
     return calib_data_v, start_time
 
@@ -115,5 +119,3 @@ def get_resource_path(filename: str) -> Path:
 
 def get_default_gpsc_path() -> Path:
     return get_resource_path('ghw280_from_egig.gpsc')
-
-generate_bel_channel_map = load_bel_channel_map
