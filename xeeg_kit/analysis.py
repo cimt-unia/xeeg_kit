@@ -12,7 +12,7 @@ import matplotlib.patches as patches
 from .bel_280 import parse_gpsc, create_montage_from_gpsc
 
 logger = logging.getLogger(__name__)
-mne.set_log_level('ERROR')
+
 
 ORBITAL_THRESH_Y, ORBITAL_THRESH_Z = 0.065, 0.015
 PFC_Z_THRESH, INFERIOR_FRONTAL_Z_THRESH = 0.015, -0.005
@@ -41,6 +41,8 @@ def _assign_region(row: pd.Series) -> str:
         return "Parietal"
     else: 
         return "Cerebellar/Neck" if z < Z_CORTEX_MIN else "Occipital"
+
+
 
 def generate_bel_channel_map(gpsc_file: str, output_csv: str = "bel_280_channel_map.csv") -> pd.DataFrame:
     if Path(output_csv).exists():
