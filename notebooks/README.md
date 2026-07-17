@@ -64,7 +64,7 @@ ICALABEL_PARAMS = {
     "subject_id": "sub-01_icalabel", # Distinct suffix avoids overwriting MEEGKit report
 }
 
-saved_paths = preprocess_bel_trials(
+run_xeegkit = preprocess_bel_trials(
     data_dir=DATA_DIR,
     output_dir=OUTPUT_DIR,
     meegkit_params=MEEGKIT_PARAMS,
