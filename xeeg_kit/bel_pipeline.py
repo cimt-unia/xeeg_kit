@@ -19,7 +19,6 @@ DEFAULT_RENAME_MAP: Dict[str, str] = {
     "REF CZ": "Cz"
 }
 
-
 def _process_single_bel_subject(
     fif_path: Path,
     out_path: Path,
@@ -38,13 +37,16 @@ def _process_single_bel_subject(
 
     raw.set_montage(montage, on_missing="warn", verbose="WARNING")
 
-    clean_1 = execute_meegkit(raw, **meegkit_params)
-    clean_2 = execute_icalabel(clean_1, **icalabel_params)
+    subject_id = fif_path.stem.split("_")[0]
+    local_meegkit_params = {**meegkit_params, "subject_id": f"{subject_id}_meegkit"}
+    local_icalabel_params = {**icalabel_params, "subject_id": f"{subject_id}_icalabel"}
+
+    clean_1 = execute_meegkit(raw, **local_meegkit_params)
+    clean_2 = execute_icalabel(clean_1, **local_icalabel_params)
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     clean_2.save(str(out_path), overwrite=overwrite, verbose="WARNING")
     logger.info("Saved: %s", out_path)
-
 
 def preprocess_bel_trials(
     data_dir: Path,
