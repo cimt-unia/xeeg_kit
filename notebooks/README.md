@@ -4,36 +4,35 @@ This guide explains how to configure and run `preprocess_bel_trials` for BEL EEG
 
 ## Required File Structure
 
-The pipeline expects a BIDS-like derivative layout. Input files must be FIF format and match the specified glob pattern.
+The pipeline expects input FIF files at the root level of `data_dir`. Files are discovered non-recursively by default.
 
 ```text
 data_dir/
-├── condition_1/
-│   ├── sub-01_condition_1_eeg_raw.fif      # Must end with _eeg_raw.fif by default
-│   └── sub-02_condition_1_eeg_raw.fif
-└── condition_2/
-    └── sub-01/
-        └── ses-01/
-            └── sub-01_condition_2_eeg_raw.fif  # Recursive search finds nested files
+├── DP02_gain_eeg_raw.fif      # Must match the glob pattern (default: *_eeg_raw.fif)
+├── DP02_loss_eeg_raw.fif
+├── DP03_gain_eeg_raw.fif
+└── DP03_loss_eeg_raw.fif
 ```
 
 -   **Input Format**: MNE-Python compatible FIF files (`.fif`).
 -   **Naming Convention**: Default pattern is `*_eeg_raw.fif`. Files not matching this pattern are ignored.
+-   **Flat Structure Only**: The pipeline uses non-recursive glob discovery. All input files must reside directly in `data_dir`. Subdirectories are not traversed.
+-   **Filename Uniqueness**: Flat output means files with identical stems will overwrite each other when `overwrite=True`. Ensure unique filenames within `data_dir`.
 -   **Channel Naming**: Raw files may use numeric EGI names (`'1'`, `'2'`) or BEL names (`'E1'`, `'E2'`). The pipeline automatically applies `DEFAULT_RENAME_MAP` to standardize to BEL nomenclature before processing.
 -   **Montage**: Sensor positions are loaded from the bundled `ghw280_from_egig.gpsc` file. No external montage file is required unless using a custom sensor layout.
 
 ## Configuration Script
 
 ```python
-# Sequential batch preprocessing for BEL 280-channel EEG epochs.
+# Sequential batch preprocessing for BEL 280-channel EEG data.
 import logging
 from pathlib import Path
 from xeeg_kit import preprocess_bel_trials
 
 logging.basicConfig(level=logging.INFO, format="[%(asctime)s] %(message)s", datefmt="%H:%M:%S")
 
-DATA_DIR = Path("/path/to/derivatives/study_name/eeg")
-OUTPUT_DIR = Path("/path/to/derivatives/study_name/eeg/clean")
+DATA_DIR = Path("/path/to/data")
+OUTPUT_DIR = Path("/path/to/output")
 
 MEEGKIT_PARAMS = {
     "highpass_filter": 1.0,          # Mandatory: ASR/ICA stability requirement
@@ -48,8 +47,8 @@ MEEGKIT_PARAMS = {
     "interpolate_bads": True,        # Spline-interpolate detected bad channels
     "verbose": True,                 # Enable stage-level logging
     "generate_report": True,         # Write interactive 3D HTML bad channel map
-    "report_dir": OUTPUT_DIR,        # Explicit directory for QA reports
-    "subject_id": "sub-01_meegkit",  # Stage-prefixed ID prevents filename collisions
+    # Note: Do NOT set report_dir or subject_id here.
+    # The pipeline manages these automatically to prevent collisions.
 }
 
 ICALABEL_PARAMS = {
@@ -60,23 +59,38 @@ ICALABEL_PARAMS = {
     "interpolate_bads": True,        # Interpolate residual bads found at ICLabel stage
     "verbose": True,                 # Log ICA fitting and component exclusion details
     "generate_report": True,         # Second HTML report for ICLabel-stage residuals
-    "report_dir": OUTPUT_DIR,        # Same directory as MEEGKit reports
-    "subject_id": "sub-01_icalabel", # Distinct suffix avoids overwriting MEEGKit report
+    # Note: Do NOT set report_dir or subject_id here.
+    # The pipeline manages these automatically to prevent collisions.
 }
 
-run_xeegkit = preprocess_bel_trials(
+saved_paths = preprocess_bel_trials(
     data_dir=DATA_DIR,
     output_dir=OUTPUT_DIR,
     meegkit_params=MEEGKIT_PARAMS,
     icalabel_params=ICALABEL_PARAMS,
     pattern="*_eeg_raw.fif",         # Glob pattern for input file discovery
-    recursive=True,                  # Traverse subdirectories preserving structure
     overwrite=True,                  # Replace existing outputs without prompting
     verbose=True                     # Enable top-level file iteration logging
 )
 
 logging.info("EEG processing complete: %d files", len(saved_paths))
 ```
+
+## Important Changes from Previous Versions
+
+### Pipeline-Managed Parameters
+The pipeline now **automatically manages** `report_dir` and `subject_id` for both processing stages. Do **not** include these parameters in `MEEGKIT_PARAMS` or `ICALABEL_PARAMS`. The pipeline:
+- Extracts the subject ID from each filename stem
+- Creates a dedicated `reports/` subdirectory within `output_dir`
+- Generates unique report filenames per subject and stage
+
+Any `report_dir` or `subject_id` values you provide will be silently overridden.
+
+### Non-Recursive File Discovery
+The `recursive` parameter has been removed. The pipeline now uses flat, non-recursive glob discovery only. All input FIF files must reside directly in `data_dir`.
+
+### Flat Output Structure
+All cleaned files are saved directly in `output_dir` with no subdirectory nesting. This eliminates the risks associated with recursive directory traversal while simplifying output management.
 
 ## Parameter Reference
 
@@ -95,8 +109,8 @@ logging.info("EEG processing complete: %d files", len(saved_paths))
 | `drop_cz`            | bool    | True          | Whether to remove Cz reference channel before processing.                   |
 | `interpolate_bads`   | bool    | True          | Whether to spline-interpolate detected bad channels.                        |
 | `generate_report`    | bool    | False         | Enable interactive 3D HTML bad channel visualization.                       |
-| `report_dir`         | Path    | CWD           | Directory for HTML reports. Defaults to current working directory if omitted. |
-| `subject_id`         | str     | "sub-unknown" | Identifier for report filename. Use stage prefix to avoid collisions.       |
+| `report_dir`         | Path    | Auto-managed  | **Do not set.** Pipeline manages this automatically.                        |
+| `subject_id`         | str     | Auto-managed  | **Do not set.** Pipeline extracts from filename and appends stage suffix.   |
 
 ### ICLabel Stage
 
@@ -108,17 +122,16 @@ logging.info("EEG processing complete: %d files", len(saved_paths))
 | `random_state`       | int     | 42            | Seed for reproducible Picard ICA initialization.                            |
 | `interpolate_bads`   | bool    | True          | Interpolate residual bad channels detected at this stage.                   |
 | `generate_report`    | bool    | False         | Enable second HTML report for ICLabel-stage bad channels.                   |
-| `report_dir`         | Path    | CWD           | Directory for HTML reports.                                                 |
-| `subject_id`         | str     | "sub-unknown" | Distinct suffix prevents overwriting MEEGKit report.                        |
+| `report_dir`         | Path    | Auto-managed  | **Do not set.** Pipeline manages this automatically.                        |
+| `subject_id`         | str     | Auto-managed  | **Do not set.** Pipeline extracts from filename and appends stage suffix.   |
 
 ### Pipeline Arguments
 
 | Argument             | Type    | Default          | Description                                                    |
 | -------------------- | ------- | ---------------- | -------------------------------------------------------------- |
-| `data_dir`           | Path    | Required         | Root directory containing input FIF files.                     |
-| `output_dir`         | Path    | Required         | Root directory for cleaned outputs and reports.                |
-| `pattern`            | str     | `*_eeg_raw.fif`  | Glob pattern for input file discovery.                         |
-| `recursive`          | bool    | True             | Search subdirectories recursively.                             |
+| `data_dir`           | Path    | Required         | Root directory containing input FIF files at top level.        |
+| `output_dir`         | Path    | Required         | Flat destination directory for cleaned outputs and reports.    |
+| `pattern`            | str     | `*_eeg_raw.fif`  | Glob pattern for input file discovery (non-recursive).         |
 | `overwrite`          | bool    | True             | Overwrite existing output files.                               |
 | `preload`            | bool    | True             | Load entire FIF into memory. Required for ASR/ICA.             |
 | `gpsc_path`          | Path    | Bundled          | Custom GPSC montage file. Uses bundled default if omitted.     |
@@ -126,30 +139,36 @@ logging.info("EEG processing complete: %d files", len(saved_paths))
 
 ## Output Structure
 
-The pipeline preserves the relative directory structure of `data_dir` within `output_dir`.
+The pipeline creates a flat output directory with a dedicated `reports/` subdirectory.
 
 ```text
 output_dir/
-├── condition_1/
-│   ├── sub-01_condition_1_eeg_raw_proc.fif          # Cleaned continuous data
-│   ├── sub-02_condition_1_eeg_raw_proc.fif
-│   ├── sub-01_meegkit_bad_channels_3d.html          # MEEGKit-stage bad channel report
-│   └── sub-01_icalabel_bad_channels_3d.html         # ICLabel-stage bad channel report
-└── condition_2/
-    └── sub-01/
-        └── ses-01/
-            ├── sub-01_condition_2_eeg_raw_proc.fif
-            ├── sub-01_meegkit_bad_channels_3d.html
-            └── sub-01_icalabel_bad_channels_3d.html
+├── DP02_gain_eeg_raw_eeg.fif          # Cleaned continuous data
+├── DP02_loss_eeg_raw_eeg.fif
+├── DP03_gain_eeg_raw_eeg.fif
+├── DP03_loss_eeg_raw_eeg.fif
+└── reports/
+    ├── DP02_meegkit_bad_channels_3d.html          # MEEGKit-stage bad channel report
+    ├── DP02_icalabel_bad_channels_3d.html         # ICLabel-stage bad channel report
+    ├── DP03_meegkit_bad_channels_3d.html
+    └── DP03_icalabel_bad_channels_3d.html
 ```
 
--   **Cleaned Data**: FIF files with `_proc` suffix containing interpolated, artifact-cleaned continuous EEG.
--   **QA Reports**: Interactive Plotly HTML files showing 3D bad channel locations colored by anatomical region. Two reports per subject when both stages have `generate_report=True`.
--   **Return Value**: `Dict[str, Path]` mapping relative input paths to absolute output paths for programmatic downstream access.
+-   **Cleaned Data**: FIF files with `_eeg` suffix containing interpolated, artifact-cleaned continuous EEG.
+-   **QA Reports**: Interactive Plotly HTML files showing 3D bad channel locations colored by anatomical region. All reports are consolidated in the `reports/` subdirectory. Two reports per subject when both stages have `generate_report=True`.
+-   **Missing Reports**: When no bad channels are detected in a stage, the corresponding HTML report is not generated. Fewer report files than expected is normal and indicates clean data.
+-   **Return Value**: `Dict[str, Path]` mapping input filenames to absolute output paths for programmatic downstream access.
 
 ## Critical Constraints
 
 1.  **ICLabel Bandpass Requirement**: `low_pass_filter` must be exactly `100.0` in `MEEGKIT_PARAMS`. Values other than 100 Hz trigger a `RuntimeWarning` from `mne_icalabel` because the classifier was trained exclusively on 1–100 Hz data. Apply narrower filters (e.g., 50 Hz) only after preprocessing completes.
-2.  **Report Filename Collisions**: When processing multiple subjects, `subject_id` must be unique per stage. Hardcoding a single identifier causes all subjects' reports to overwrite each other. Extract subject IDs dynamically from filenames in production batches.
-3.  **Output Naming Warning**: The default `_proc` suffix triggers an MNE naming convention warning. This does not affect data integrity but may cause issues with BIDS validators. Rename outputs to `_eeg.fif` if strict compliance is required.
-4.  **Dual Bad Channel Detection**: MEEGKit detects sensor-level hardware failures on pre-CAR filtered data. ICLabel detects residual biological/environmental artifacts on post-cleaning re-referenced data. Both sets are independently interpolated. The two reports provide complementary QA information and are not redundant.
+
+2.  **Pipeline-Managed Parameters**: Do not set `report_dir` or `subject_id` in `MEEGKIT_PARAMS` or `ICALABEL_PARAMS`. The pipeline automatically manages these to ensure unique filenames and consistent report organization. Any values you provide will be silently overridden by the local merge operation.
+
+3.  **Flat Structure Requirements**: All input files must reside directly in `data_dir` (no subdirectories). The pipeline uses non-recursive glob discovery. Filenames must be unique to prevent output collisions.
+
+4.  **Output Naming**: The default output suffix is `_eeg` (producing files like `sub-01_task_eeg_raw_eeg.fif`). This prevents BIDS validation issues while maintaining clear provenance of the processing pipeline.
+
+5.  **Dual Bad Channel Detection**: MEEGKit detects sensor-level hardware failures on pre-CAR filtered data. ICLabel detects residual biological/environmental artifacts on post-cleaning re-referenced data. Both sets are independently interpolated. The two reports provide complementary QA information and are not redundant.
+
+
