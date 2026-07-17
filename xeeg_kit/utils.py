@@ -21,7 +21,7 @@ DEFAULT_CLEANEST_START = 0.0
 def detect_bad_channels(
     raw: mne.io.Raw,
     mad_threshold: float = DEFAULT_MAD_THRESHOLD,
-    min_amplitude_uv: float = DEFAULT_MIN_AMP_UV
+    min_amplitude_uv: float = DEFAULT_MIN_AMPLITUDE_UV
 ) -> List[str]:
     raw_eeg = raw.copy().pick("eeg")
     data_uv = raw_eeg.get_data() * 1e6
