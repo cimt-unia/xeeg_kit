@@ -92,43 +92,41 @@ clean_2.save("final_cleaned.fif", overwrite=True)
 ### B. BEL 280 Sequential Batch Processing
 
 ```python
-# Sequential batch preprocessing for BEL 280-channel EEG epochs with QA reporting.
+# Sequential batch preprocessing for BEL 280-channel EEG data.
 import logging
 from pathlib import Path
 from xeeg_kit import preprocess_bel_trials
 
 logging.basicConfig(level=logging.INFO, format="[%(asctime)s] %(message)s", datefmt="%H:%M:%S")
 
-DATA_DIR = Path("/mnt/movement/users/jaizor/xtra/derivatives/ocd/trials/dp02")
-OUTPUT_DIR = Path("/mnt/movement/users/jaizor/xtra/derivatives/ocd/trials/dp02/clean")
+DATA_DIR = Path("/mnt/movement/users/jaizor/xtra/derivatives/ocd/trials/dp02/eeg_raw")
+OUTPUT_DIR = Path("/mnt/movement/users/jaizor/xtra/derivatives/ocd/trials/dp02/eeg_clean")
 
 MEEGKIT_PARAMS = {
-    "highpass_filter": 1.0,
-    "low_pass_filter": 100.0,
-    "notch_filter_freq": 60.0,
-    "mad_threshold": 25.0,
-    "min_amplitude_uv": 0.1,
-    "asr_cutoff": 3.5,
-    "star_thresh": 3.5,
-    "sns_neighbors": 8,
-    "drop_cz": True,
-    "interpolate_bads": True,
-    "verbose": True,
-    "generate_report": True,
-    "report_dir": OUTPUT_DIR,
-    "subject_id": "dp02_meegkit",
+    "highpass_filter": 1.0,          # Mandatory: ASR/ICA stability requirement
+    "low_pass_filter": 100.0,        # Mandatory: ICLabel requires 1-100 Hz bandpass
+    "notch_filter_freq": 60.0,       # Line noise removal
+    "mad_threshold": 25.0,           # Noisy channel detection sensitivity
+    "min_amplitude_uv": 0.1,         # Flat channel threshold in microvolts
+    "asr_cutoff": 3.5,               # ASR burst rejection threshold
+    "star_thresh": 3.0,              # STAR artifact removal threshold
+    "sns_neighbors": 8,              # Sensor Noise Suppression neighbor count
+    "drop_cz": True,                 # Remove Cz reference before cleaning
+    "interpolate_bads": True,        # Spline-interpolate detected bad channels
+    "verbose": True,                 # Enable stage-level logging
+    "generate_report": True,         # Write interactive 3D HTML bad channel map
+    # NOTE: Do NOT set report_dir or subject_id - pipeline manages these automatically
 }
 
 ICALABEL_PARAMS = {
-    "mad_threshold": 35.0,
-    "min_amplitude_uv": 0.1,
-    "n_components": 0.95,
-    "random_state": 42,
-    "interpolate_bads": True,
-    "verbose": True,
-    "generate_report": True,
-    "report_dir": OUTPUT_DIR,
-    "subject_id": "dp02_icalabel",
+    "mad_threshold": 50.0,           # Stricter residual bad channel detection
+    "min_amplitude_uv": 0.1,         # Flat channel check on re-referenced data
+    "n_components": 0.95,            # Explained variance for ICA dimensionality
+    "random_state": 42,              # Reproducible Picard ICA initialization
+    "interpolate_bads": True,        # Interpolate residual bads at ICLabel stage
+    "verbose": True,                 # Log ICA fitting and component exclusion
+    "generate_report": True,         # Second HTML report for ICLabel residuals
+    # NOTE: Do NOT set report_dir or subject_id - pipeline manages these automatically
 }
 
 saved_paths = preprocess_bel_trials(
@@ -136,10 +134,9 @@ saved_paths = preprocess_bel_trials(
     output_dir=OUTPUT_DIR,
     meegkit_params=MEEGKIT_PARAMS,
     icalabel_params=ICALABEL_PARAMS,
-    pattern="*_eeg_raw.fif",
-    recursive=True,
-    overwrite=True,
-    verbose=True,
+    pattern="*_eeg_raw.fif",         # Glob pattern for input file discovery
+    overwrite=True,                  # Replace existing outputs without prompting
+    verbose=True,                    # Enable top-level file iteration logging
 )
 
 logging.info("EEG processing complete: %d files", len(saved_paths))
