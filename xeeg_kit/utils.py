@@ -1,28 +1,25 @@
 # xeeg_kit/utils.py
-"""
-General-purpose utilities shared across modules.
-"""
-import time
-from typing import List, Tuple, Optional
+
+# General-purpose utilities and mathematical helpers for EEG processing.
+import logging
+from typing import List, Tuple
 import numpy as np
 from scipy.stats import median_abs_deviation
+import mne
 
+logger = logging.getLogger(__name__)
 
-def log(msg: str, subject_id: Optional[str] = None):
-    timestamp = time.strftime("%H:%M:%S")
-    if subject_id:
-        print(f"[{timestamp}] [{subject_id}] {msg}")
-    else:
-        print(f"[{timestamp}] {msg}")
-
+DEFAULT_MAD_THRESHOLD = 15.0
+DEFAULT_MIN_AMPLITUDE_UV = 0.1
+DEFAULT_CLEANEST_DURATION = 30.0
+DEFAULT_CLEANEST_STEP = 2.0
+DEFAULT_CLEANEST_START = 0.0
 
 def detect_bad_channels(
-    raw: 'mne.io.Raw',
-    mad_threshold: float = 10.0,
-    min_amplitude_uv: float = 0.1
+    raw: mne.io.Raw,
+    mad_threshold: float = DEFAULT_MAD_THRESHOLD,
+    min_amplitude_uv: float = DEFAULT_MIN_AMPLITUDE_UV
 ) -> List[str]:
-    """Detect flat and noisy EEG channels."""
-    import mne
     raw_eeg = raw.copy().pick("eeg")
     data_uv = raw_eeg.get_data() * 1e6
     amplitude = np.ptp(data_uv, axis=1)
@@ -37,35 +34,36 @@ def detect_bad_channels(
         if not np.isnan(mad) and mad > 1e-12:
             z = (feat - np.nanmedian(feat)) / mad
             noisy_mask |= z > mad_threshold
+            
     noisy_chs = [ch for ch, is_noisy in zip(raw_eeg.ch_names, noisy_mask) if is_noisy]
-
     return sorted(set(flat_chs + noisy_chs))
 
 def find_cleanest_segment(
-    raw: 'mne.io.Raw',
-    duration_sec: float = 30.0,
-    step_sec: float = 2.0,
-    start_sec: float = 0.0
+    raw: mne.io.Raw,
+    duration_sec: float = DEFAULT_CLEANEST_DURATION,
+    step_sec: float = DEFAULT_CLEANEST_STEP,
+    start_sec: float = DEFAULT_CLEANEST_START
 ) -> Tuple[np.ndarray, float]:
-    """Find the cleanest continuous segment for ASR calibration."""
     sfreq = raw.info["sfreq"]
     duration_samp = int(duration_sec * sfreq)
     step_samp = int(step_sec * sfreq)
     total_samp = raw.n_times
 
     if total_samp < duration_samp:
-        log(f"⚠️ Trial too short ({total_samp / sfreq:.1f}s). Using full trial.")
+        logger.warning("Trial too short (%.1fs). Using full trial.", total_samp / sfreq)
         return raw.get_data(), 0.0
 
     data_v = raw.get_data()
     start_samp = int(start_sec * sfreq)
     n_windows = (total_samp - duration_samp - start_samp) // step_samp + 1
+    assert n_windows > 0, "Invalid window calculation parameters."
 
     variances = []
     amplitudes = []
 
     for i in range(n_windows):
-        start, end = i * step_samp + start_samp, i * step_samp + start_samp + duration_samp
+        start = i * step_samp + start_samp
+        end = start + duration_samp
         win = data_v[:, start:end]
         if np.ptp(win) < 1e-9:
             continue
@@ -76,14 +74,13 @@ def find_cleanest_segment(
             amplitudes.append(amp_metric)
 
     if not variances:
-        log("⚠️ No valid windows found. Using first segment as calibration.")
+        logger.warning("No valid windows found. Using first segment as calibration.")
         return data_v[:, :duration_samp], 0.0
 
-    variances = np.array(variances)
-    amplitudes = np.array(amplitudes)
+    variances_arr = np.array(variances)
+    amplitudes_arr = np.array(amplitudes)
 
-    def mad_zscore(x):
-        x = np.atleast_1d(x)
+    def mad_zscore(x: np.ndarray) -> np.ndarray:
         x_clean = x[np.isfinite(x)]
         if len(x_clean) == 0:
             return np.zeros_like(x)
@@ -95,14 +92,14 @@ def find_cleanest_segment(
         z[~np.isfinite(z)] = 0
         return z
 
-    score = mad_zscore(variances) + mad_zscore(amplitudes)
-    best_idx = np.argmin(score)
+    score = mad_zscore(variances_arr) + mad_zscore(amplitudes_arr)
+    best_idx = int(np.argmin(score))
     best_start = best_idx * step_samp + start_samp
     calib_data_v = data_v[:, best_start:best_start + duration_samp]
     start_time = best_start / sfreq
-    log(f"✅ Cleanest segment at t={start_time:.1f}s (score={score[best_idx]:.2f})")
+    
+    logger.info("Cleanest segment at t=%.1fs (score=%.2f)", start_time, score[best_idx])
     return calib_data_v, start_time
-
 
 
 
