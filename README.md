@@ -155,6 +155,12 @@ results = process_subjects_parallel(
 -   **Notch Filtering**: When `low_pass_filter < notch_filter_freq`, the notch is automatically skipped. Set `notch_filter_freq=None` to disable explicitly.
 -   **Bundled Resources**: The default GPSC file is included in the package. Access via `get_default_gpsc_path()` without external downloads. Override by passing `gpsc_path=` explicitly.
 -   **Output Naming**: Processed files use the `_proc` suffix by default (BIDS-aligned).
+-   
+-   **ICLabel Filtering Requirement**: `execute_icalabel` requires input data bandpass filtered between **1–100 Hz**. Set `low_pass_filter=100.0` in `meegkit_params` to satisfy this constraint and avoid false-positive warnings. Apply narrower lowpass filters (e.g., 50 Hz) only *after* preprocessing completes to preserve ICA component separability.
+-   **Bad Channel Reports**: Enable interactive 3D visualization by adding `"generate_report": True`, `"report_dir": <path>`, and `"subject_id": "<id>"` to both `meegkit_params` and `icalabel_params`. Two separate HTML reports are generated per subject because each stage detects distinct artifact types:
+    -   `{subject_id}_meegkit_bad_channels_3d.html`: Sensor-level hardware/contact failures detected on filtered pre-CAR data via amplitude flatness and MAD-zscore thresholds.
+    -   `{subject_id}_icalabel_bad_channels_3d.html`: Residual noisy sensors detected on post-MEEGKit-cleaned data that corrupt ICA decomposition.
+    Both bad channel sets are independently interpolated. Use stage-prefixed `subject_id` values (e.g., `"dp02_meegkit"`, `"dp02_icalabel"`) to prevent filename collisions.
 
 <br>
 
