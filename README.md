@@ -92,59 +92,59 @@ clean_2.save("final_cleaned.fif", overwrite=True)
 ### B. BEL 280 Sequential Batch Processing
 
 ```python
+# Sequential batch preprocessing for BEL 280-channel EEG epochs with QA reporting.
+import logging
 from pathlib import Path
 from xeeg_kit import preprocess_bel_trials
 
-meegkit_params = {
+logging.basicConfig(level=logging.INFO, format="[%(asctime)s] %(message)s", datefmt="%H:%M:%S")
+
+DATA_DIR = Path("/mnt/movement/users/jaizor/xtra/derivatives/ocd/trials/dp02")
+OUTPUT_DIR = Path("/mnt/movement/users/jaizor/xtra/derivatives/ocd/trials/dp02/clean")
+
+MEEGKIT_PARAMS = {
     "highpass_filter": 1.0,
-    "low_pass_filter": 50.0,
+    "low_pass_filter": 100.0,
     "notch_filter_freq": 60.0,
-    "mad_threshold": 15.0,
+    "mad_threshold": 25.0,
+    "min_amplitude_uv": 0.1,
     "asr_cutoff": 3.5,
     "star_thresh": 3.5,
     "sns_neighbors": 8,
     "drop_cz": True,
     "interpolate_bads": True,
     "verbose": True,
+    "generate_report": True,
+    "report_dir": OUTPUT_DIR,
+    "subject_id": "dp02_meegkit",
 }
 
-icalabel_params = {
-    "mad_threshold": 20.0,
+ICALABEL_PARAMS = {
+    "mad_threshold": 35.0,
+    "min_amplitude_uv": 0.1,
     "n_components": 0.95,
     "random_state": 42,
     "interpolate_bads": True,
     "verbose": True,
+    "generate_report": True,
+    "report_dir": OUTPUT_DIR,
+    "subject_id": "dp02_icalabel",
 }
 
 saved_paths = preprocess_bel_trials(
-    data_dir=Path("/data/trials/dp02"),
-    output_dir=Path("/data/trials/dp02/clean"),
-    meegkit_params=meegkit_params,
-    icalabel_params=icalabel_params,
+    data_dir=DATA_DIR,
+    output_dir=OUTPUT_DIR,
+    meegkit_params=MEEGKIT_PARAMS,
+    icalabel_params=ICALABEL_PARAMS,
     pattern="*_eeg_raw.fif",
     recursive=True,
     overwrite=True,
     verbose=True,
 )
+
+logging.info("EEG processing complete: %d files", len(saved_paths))
 ```
 
-### C. BEL 280 Parallel Processing
-
-```python
-from xeeg_kit import process_subjects_parallel
-
-input_files = ["sub01.mff", "sub02.mff", "sub03.mff"]
-output_dir = "cleaned_data/"
-
-results = process_subjects_parallel(
-    input_files=input_files,
-    output_dir=output_dir,
-    meegkit_params=meegkit_params,
-    icalabel_params=icalabel_params,
-    n_jobs=-1,
-    verbose=True
-)
-```
 
 <br>
 
