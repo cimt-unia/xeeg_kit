@@ -1,10 +1,12 @@
 # xeeg_kit/bel_pipeline.py
 
-# BEL EEG System One preprocessing pipeline supporting recursive BIDS-like layouts.
+# BEL EEG preprocessing pipeline with flat output structure and dedicated report directory.
 import logging
 from pathlib import Path
 from typing import Dict, Any, Optional, List
+
 import mne
+
 from .bel_280 import parse_gpsc, create_montage_from_gpsc
 from .artifact_cleaning import execute_meegkit, execute_icalabel
 from .utils import get_default_gpsc_path
@@ -12,22 +14,25 @@ from .utils import get_default_gpsc_path
 logger = logging.getLogger(__name__)
 
 BEL_CHANNEL_COUNT = 280
-DEFAULT_OUTPUT_SUFFIX = "_proc"
+DEFAULT_OUTPUT_SUFFIX = "_eeg"
 DEFAULT_EEG_PATTERN = "*_eeg_raw.fif"
+REPORT_SUBDIR_NAME = "reports"
 DEFAULT_RENAME_MAP: Dict[str, str] = {
     **{str(i): f"E{i}" for i in range(1, BEL_CHANNEL_COUNT + 1)},
-    "REF CZ": "Cz"
+    "REF CZ": "Cz",
 }
+
 
 def _process_single_bel_subject(
     fif_path: Path,
     out_path: Path,
+    report_dir: Path,
     montage: mne.channels.DigMontage,
     rename_map: Dict[str, str],
     meegkit_params: Dict[str, Any],
     icalabel_params: Dict[str, Any],
     preload: bool,
-    overwrite: bool
+    overwrite: bool,
 ) -> None:
     raw = mne.io.read_raw_fif(str(fif_path), preload=preload, verbose="WARNING")
 
@@ -38,8 +43,16 @@ def _process_single_bel_subject(
     raw.set_montage(montage, on_missing="warn", verbose="WARNING")
 
     subject_id = fif_path.stem.split("_")[0]
-    local_meegkit_params = {**meegkit_params, "subject_id": f"{subject_id}_meegkit"}
-    local_icalabel_params = {**icalabel_params, "subject_id": f"{subject_id}_icalabel"}
+    local_meegkit_params = {
+        **meegkit_params,
+        "subject_id": f"{subject_id}_meegkit",
+        "report_dir": report_dir,
+    }
+    local_icalabel_params = {
+        **icalabel_params,
+        "subject_id": f"{subject_id}_icalabel",
+        "report_dir": report_dir,
+    }
 
     clean_1 = execute_meegkit(raw, **local_meegkit_params)
     clean_2 = execute_icalabel(clean_1, **local_icalabel_params)
@@ -48,6 +61,7 @@ def _process_single_bel_subject(
     clean_2.save(str(out_path), overwrite=overwrite, verbose="WARNING")
     logger.info("Saved: %s", out_path)
 
+
 def preprocess_bel_trials(
     data_dir: Path,
     output_dir: Path,
@@ -55,11 +69,10 @@ def preprocess_bel_trials(
     meegkit_params: Optional[Dict[str, Any]] = None,
     icalabel_params: Optional[Dict[str, Any]] = None,
     pattern: str = DEFAULT_EEG_PATTERN,
-    recursive: bool = True,
     rename_map: Optional[Dict[str, str]] = None,
     preload: bool = True,
     overwrite: bool = True,
-    verbose: bool = False
+    verbose: bool = False,
 ) -> Dict[str, Path]:
     if verbose:
         logging.basicConfig(level=logging.INFO, format="[%(asctime)s] %(message)s", datefmt="%H:%M:%S")
@@ -74,35 +87,38 @@ def preprocess_bel_trials(
         raise FileNotFoundError(f"GPSC montage file not found: {resolved_gpsc}")
 
     output_dir.mkdir(parents=True, exist_ok=True)
+    report_dir = output_dir / REPORT_SUBDIR_NAME
+    report_dir.mkdir(parents=True, exist_ok=True)
 
     active_rename_map = dict(rename_map) if rename_map is not None else dict(DEFAULT_RENAME_MAP)
     channels = parse_gpsc(str(resolved_gpsc))
     montage = create_montage_from_gpsc(channels)
 
-    glob_fn = data_dir.rglob if recursive else data_dir.glob
-    fif_files: List[Path] = sorted(glob_fn(pattern))
+    fif_files: List[Path] = sorted(data_dir.glob(pattern))
 
     if not fif_files:
-        raise ValueError(f"No files matching '{pattern}' found in {data_dir} (recursive={recursive})")
+        raise ValueError(f"No files matching '{pattern}' found in {data_dir}")
 
     saved_paths: Dict[str, Path] = {}
     for fif_path in fif_files:
-        relative_parent = fif_path.parent.relative_to(data_dir)
-        out_path = output_dir / relative_parent / f"{fif_path.stem}{DEFAULT_OUTPUT_SUFFIX}.fif"
+        out_path = output_dir / f"{fif_path.stem}{DEFAULT_OUTPUT_SUFFIX}.fif"
 
-        logger.info("Processing: %s", fif_path.relative_to(data_dir))
+        logger.info("Processing: %s", fif_path.name)
 
         _process_single_bel_subject(
             fif_path=fif_path,
             out_path=out_path,
+            report_dir=report_dir,
             montage=montage,
             rename_map=active_rename_map,
             meegkit_params=meegkit_params or {},
             icalabel_params=icalabel_params or {},
             preload=preload,
-            overwrite=overwrite
+            overwrite=overwrite,
         )
-        saved_paths[str(fif_path.relative_to(data_dir))] = out_path
+        saved_paths[fif_path.name] = out_path
 
     logger.info("Pipeline complete. %d file(s) processed.", len(saved_paths))
     return saved_paths
+
+
