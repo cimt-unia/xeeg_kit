@@ -11,7 +11,7 @@ from .artifact_cleaning import execute_meegkit, execute_icalabel
 logger = logging.getLogger(__name__)
 
 BEL_CHANNEL_COUNT = 280
-DEFAULT_OUTPUT_SUFFIX = "_cleaned"
+DEFAULT_OUTPUT_SUFFIX = "__preproc"
 DEFAULT_EEG_PATTERN = "*_eeg_raw.fif"
 DEFAULT_RENAME_MAP: Dict[str, str] = {
     **{str(i): f"E{i}" for i in range(1, BEL_CHANNEL_COUNT + 1)},
