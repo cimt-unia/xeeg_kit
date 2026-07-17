@@ -87,7 +87,7 @@ logging.info("EEG processing complete: %d files", len(saved_paths))
 | `highpass_filter`    | float   | 1.0           | High-pass cutoff in Hz. Must be ≥1.0 for ASR/ICA stability.                |
 | `low_pass_filter`    | float   | 100.0         | Low-pass cutoff in Hz. **Must be 100.0** for ICLabel compatibility.         |
 | `notch_filter_freq`  | float   | 60.0          | Notch frequency in Hz. Automatically skipped if > `low_pass_filter`.        |
-| `mad_threshold`      | float   | 15.0          | MAD-zscore threshold for noisy channel detection. Higher values are stricter. |
+| `mad_threshold`      | float   | 25.0          | MAD-zscore threshold for noisy channel detection. Higher values are stricter. |
 | `min_amplitude_uv`   | float   | 0.1           | Minimum peak-to-peak amplitude in µV. Channels below are flagged as flat.   |
 | `asr_cutoff`         | float   | 3.5           | ASR burst rejection threshold in standard deviation units.                  |
 | `star_thresh`        | float   | 3.5           | STAR artifact subspace reconstruction threshold.                            |
