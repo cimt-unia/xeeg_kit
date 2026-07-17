@@ -7,11 +7,12 @@ from typing import Dict, Any, Optional, List
 import mne
 from .bel_280 import parse_gpsc, create_montage_from_gpsc
 from .artifact_cleaning import execute_meegkit, execute_icalabel
+from .utils import get_default_gpsc_path
 
 logger = logging.getLogger(__name__)
 
 BEL_CHANNEL_COUNT = 280
-DEFAULT_OUTPUT_SUFFIX = "__proc"
+DEFAULT_OUTPUT_SUFFIX = "_proc"
 DEFAULT_EEG_PATTERN = "*_eeg_raw.fif"
 DEFAULT_RENAME_MAP: Dict[str, str] = {
     **{str(i): f"E{i}" for i in range(1, BEL_CHANNEL_COUNT + 1)},
@@ -48,9 +49,9 @@ def _process_single_bel_subject(
 def preprocess_bel_trials(
     data_dir: Path,
     output_dir: Path,
-    gpsc_path: Path,
-    meegkit_params: Dict[str, Any],
-    icalabel_params: Dict[str, Any],
+    gpsc_path: Optional[Path] = None,
+    meegkit_params: Optional[Dict[str, Any]] = None,
+    icalabel_params: Optional[Dict[str, Any]] = None,
     pattern: str = DEFAULT_EEG_PATTERN,
     recursive: bool = True,
     rename_map: Optional[Dict[str, str]] = None,
@@ -63,17 +64,17 @@ def preprocess_bel_trials(
 
     data_dir = Path(data_dir)
     output_dir = Path(output_dir)
-    gpsc_path = Path(gpsc_path)
+    resolved_gpsc = Path(gpsc_path) if gpsc_path is not None else get_default_gpsc_path()
 
     if not data_dir.exists():
         raise FileNotFoundError(f"Data directory not found: {data_dir}")
-    if not gpsc_path.exists():
-        raise FileNotFoundError(f"GPSC montage file not found: {gpsc_path}")
+    if not resolved_gpsc.exists():
+        raise FileNotFoundError(f"GPSC montage file not found: {resolved_gpsc}")
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
     active_rename_map = dict(rename_map) if rename_map is not None else dict(DEFAULT_RENAME_MAP)
-    channels = parse_gpsc(str(gpsc_path))
+    channels = parse_gpsc(str(resolved_gpsc))
     montage = create_montage_from_gpsc(channels)
 
     glob_fn = data_dir.rglob if recursive else data_dir.glob
@@ -94,8 +95,8 @@ def preprocess_bel_trials(
             out_path=out_path,
             montage=montage,
             rename_map=active_rename_map,
-            meegkit_params=meegkit_params,
-            icalabel_params=icalabel_params,
+            meegkit_params=meegkit_params or {},
+            icalabel_params=icalabel_params or {},
             preload=preload,
             overwrite=overwrite
         )
