@@ -1,7 +1,8 @@
 # xeeg_kit/_config.py
+
+# Environment variable configuration for BLAS thread limiting.
 import os
 
-# Set BEFORE any scientific imports
 os.environ.setdefault("OMP_NUM_THREADS", "1")
 os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
 os.environ.setdefault("MKL_NUM_THREADS", "1")
