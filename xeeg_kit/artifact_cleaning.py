@@ -48,7 +48,9 @@ def _mark_bad_channels(raw: mne.io.Raw, mad_threshold: float, min_amplitude_uv: 
 def _prepare_good_data(raw: mne.io.Raw) -> tuple[mne.io.Raw, List[int], np.ndarray]:
     raw.set_eeg_reference('average', projection=False, verbose=False)
     good_idx = mne.pick_types(raw.info, eeg=True, exclude='bads')
-    assert len(good_idx) > 0, "No good EEG channels found after bad channel detection."
+
+    if len(good_idx) == 0:
+        raise ValueError("No good EEG channels found after bad channel detection.")
     good_names = [raw.ch_names[i] for i in good_idx]
     data_good = raw.get_data(picks=good_idx)
     info_good = mne.create_info(ch_names=good_names, sfreq=raw.info['sfreq'], ch_types='eeg')
