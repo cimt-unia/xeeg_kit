@@ -2,6 +2,8 @@
 
 **Core Philosophy: “Repair, Not Reject”**
 
+<br>
+
 We present a comprehensive framework for processing continuous high-density EEG data (280 channels) that combines state-of-the-art artifact removal techniques. The pipeline integrates MEEGKit algorithms (ASR, STAR, SNS) with ICA deep learning component classification (ICLabel).
 
 Our approach addresses the unique challenges of long-duration recordings while maintaining spatial precision through enhanced coregistration and coordinate normalization.
@@ -14,7 +16,7 @@ Built on [MNE-Python](https://mne.tools), `xeeg_kit` integrates:
 -   BEL-specific utilities for channel renaming and montage handling
 -   Parallel processing for batch analysis of BEL datasets
 
----
+<br>
 
 ## Installation
 
@@ -30,7 +32,7 @@ pip install git+https://github.com/cimt-unia/xeeg_kit.git
 
 > **Dependencies**: `mne`, `meegkit`, `mne-icalabel`, `numpy`, `scipy`, `joblib`, `plotly`, `pandas`, `matplotlib`
 
----
+<br>
 
 ## Core Features
 
@@ -47,7 +49,7 @@ Use `execute_meegkit` and `execute_icalabel` with **any MNE-supported format** (
 -   `preprocess_bel_trials`: Recursive discovery with structure-preserving output for single-machine workflows
 -   `process_subjects_parallel`: Multi-core orchestration with per-subject logging for large cohorts
 
----
+<br>
 
 ## Usage Examples
 
@@ -144,7 +146,7 @@ results = process_subjects_parallel(
 )
 ```
 
----
+<br>
 
 ## Important Notes
 
@@ -154,7 +156,7 @@ results = process_subjects_parallel(
 -   **Bundled Resources**: The default GPSC file is included in the package. Access via `get_default_gpsc_path()` without external downloads. Override by passing `gpsc_path=` explicitly.
 -   **Output Naming**: Processed files use the `_proc` suffix by default (BIDS-aligned).
 
----
+<br>
 
 ## Project Structure
 
@@ -172,13 +174,13 @@ xeeg_kit/
 └── data/                 # Bundled GPSC and channel map CSV
 ```
 
----
+<br>
 
 ## License
 
 MIT License — free for academic and commercial use.
 
----
+<br>
 
 ## Acknowledgements
 
