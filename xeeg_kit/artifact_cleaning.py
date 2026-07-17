@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_HIGHPASS = 1.0
 DEFAULT_LOWPASS = 100.0
 DEFAULT_NOTCH = 60.0
-DEFAULT_MAD_THRESH = 15.0
+DEFAULT_MAD_THRESH = 25.0
 DEFAULT_MIN_AMP_UV = 0.1
 DEFAULT_ASR_CUTOFF = 3.5
 DEFAULT_STAR_THRESH = 3.5
@@ -123,7 +123,7 @@ def execute_meegkit(
     return raw
 
 def execute_icalabel(
-    raw: mne.io.Raw, icalabel_thresholds: Optional[Dict[str, float]] = None, mad_threshold: float = 20.0,
+    raw: mne.io.Raw, icalabel_thresholds: Optional[Dict[str, float]] = None, mad_threshold: float = 35.0,
     min_amplitude_uv: float = DEFAULT_MIN_AMP_UV, n_components: Any = DEFAULT_ICA_COMP, random_state: int = DEFAULT_ICA_SEED,
     interpolate_bads: bool = True, generate_report: bool = False, report_dir: Optional[Union[str, Path]] = None,
     subject_id: str = "sub-unknown", verbose: bool = True
