@@ -161,23 +161,7 @@ logging.info("EEG processing complete: %d files", len(saved_paths))
 
 <br>
 
-## Project Structure
 
-```
-xeeg_kit/
-├── __init__.py           # Public API exports
-├── _config.py            # BLAS thread limits (critical for parallelism)
-├── artifact_cleaning.py  # Core cleaning pipelines (format-agnostic)
-├── bel_280.py            # BEL geometry, montage, and standardization
-├── bel_pipeline.py       # BEL sequential batch processing
-├── parallel.py           # BEL parallel orchestration
-├── utils.py              # Bad channel detection, resource loading, calibration
-├── viz.py                # Anatomical mapping and 3D visualization
-├── analysis.py           # Channel selection and comparison plotting
-└── data/                 # Bundled GPSC and channel map CSV
-```
-
-<br>
 
 ## License
 
