@@ -164,7 +164,7 @@ logging.info("EEG processing complete: %d files", len(saved_paths))
 
 ## License
 
-MIT License — free for academic and commercial use.
+MIT License, free for academic and commercial use.
 
 <br>
 
