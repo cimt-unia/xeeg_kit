@@ -42,12 +42,12 @@ MEEGKIT_PARAMS = {
     "notch_filter_freq": 60.0,   # Removes line noise (set None to disable)
 
     # BAD CHANNEL DETECTION
-    "mad_threshold": 25.0,       # Noisy channel sensitivity (higher = stricter)
+    "mad_threshold": 10.0,       # Noisy channel sensitivity (higher = stricter)
     "min_amplitude_uv": 0.1,     # Flat channel threshold in µV
 
     # ARTIFACT REMOVAL
     "asr_cutoff": 3.5,           # ASR burst rejection threshold (SD units)
-    "star_thresh": 3.5,          # STAR artifact removal threshold
+    "star_thresh": 3.0,          # STAR artifact removal threshold
     "sns_neighbors": 8,          # Sensor Noise Suppression neighbor count
 
     # PROCESSING OPTIONS
@@ -69,12 +69,12 @@ MEEGKIT_PARAMS = {
 # residual biological/environmental artifacts from re-referenced data.
 ICALABEL_PARAMS = {
     # RESIDUAL BAD CHANNEL DETECTION (stricter post-cleaning)
-    "mad_threshold": 35.0,       # Higher threshold for already-cleaned data
+    "mad_threshold": 80.0,       # Higher threshold for already-cleaned data
     "min_amplitude_uv": 0.1,     # Flat channel check on re-referenced data
 
     # ICA DECOMPOSITION
     "n_components": 0.95,        # Retain components explaining 95% variance
-    "random_state": 42,          # Fixed seed for reproducible Picard ICA
+    "random_state": 45,          # Fixed seed for reproducible Picard ICA
 
     # PROCESSING & REPORTING
     "interpolate_bads": True,    # Interpolate residual bads found here
