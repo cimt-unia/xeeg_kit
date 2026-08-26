@@ -106,10 +106,10 @@ MEEGKIT_PARAMS = {
     "highpass_filter": 1.0,          # Mandatory: ASR/ICA stability requirement
     "low_pass_filter": 100.0,        # Mandatory: ICLabel requires 1-100 Hz bandpass
     "notch_filter_freq": 60.0,       # Line noise removal
-    "mad_threshold": 25.0,           # Noisy channel detection sensitivity
+    "mad_threshold": 10.0,           # Noisy channel detection sensitivity
     "min_amplitude_uv": 0.1,         # Flat channel threshold in microvolts
-    "asr_cutoff": 3.5,               # ASR burst rejection threshold
-    "star_thresh": 3.0,              # STAR artifact removal threshold
+    "asr_cutoff": 2.5,               # ASR burst rejection threshold
+    "star_thresh": 2.0,              # STAR artifact removal threshold
     "sns_neighbors": 8,              # Sensor Noise Suppression neighbor count
     "drop_cz": True,                 # Remove Cz reference before cleaning
     "interpolate_bads": True,        # Spline-interpolate detected bad channels
@@ -119,7 +119,7 @@ MEEGKIT_PARAMS = {
 }
 
 ICALABEL_PARAMS = {
-    "mad_threshold": 50.0,           # Stricter residual bad channel detection
+    "mad_threshold": 25.0,           # Stricter residual bad channel detection
     "min_amplitude_uv": 0.1,         # Flat channel check on re-referenced data
     "n_components": 0.95,            # Explained variance for ICA dimensionality
     "random_state": 42,              # Reproducible Picard ICA initialization
