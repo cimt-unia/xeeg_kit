@@ -19,6 +19,13 @@ from .viz import (
     plot_bad_channels_3d
 )
 
+# Interactive pre-cleaning toolkit
+from .pre_cleaning import (
+    inspect_bad_channels,
+    fit_ica_with_labels,
+    apply_pre_cleaning,
+)
+
 create_bel_channel_map = load_bel_channel_map
 
 __version__ = "0.2.0"
