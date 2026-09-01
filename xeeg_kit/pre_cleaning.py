@@ -90,7 +90,7 @@ def inspect_bad_channels(
 
 def fit_ica_with_labels(
     raw: mne.io.Raw,
-    n_components: float = 0.95,
+    n_components: float = 0.99,
     highpass: float = DEFAULT_HIGHPASS,
     lowpass: float = DEFAULT_LOWPASS,
     notch_freq: float = DEFAULT_NOTCH,
