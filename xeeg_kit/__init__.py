@@ -16,7 +16,7 @@ from .viz import (
     print_anatomical_summary,
     load_bel_channel_map,
     plot_headset_3d,
-    plot_bad_channels_3d
+    plot_bad_channels_3d,
 )
 
 # Interactive pre-cleaning toolkit
@@ -24,6 +24,7 @@ from .pre_cleaning import (
     inspect_bad_channels,
     fit_ica_with_labels,
     apply_pre_cleaning,
+    auto_preclean,
 )
 
 # Epoch-level cleaning pipeline (autoreject + RANSAC + ICLabel)
@@ -37,5 +38,5 @@ from .epoch_bel_pipeline import preprocess_bel_epochs, DEFAULT_EPOCH_PATTERN
 
 create_bel_channel_map = load_bel_channel_map
 
-__version__ = "0.2.0" 
+__version__ = "0.2.0"
 __author__ = "CIMT"
