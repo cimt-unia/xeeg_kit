@@ -248,6 +248,7 @@ def auto_preclean(
     lowpass: float = DEFAULT_LOWPASS,
     notch_freq: float = DEFAULT_NOTCH,
     random_state: int = 42,
+    drop_channels: Optional[List[str]] = None,
     overwrite: bool = True,
 ) -> mne.io.Raw:
     """Apply conservative automated pre-cleaning to full continuous data.
@@ -258,10 +259,11 @@ def auto_preclean(
     trial-specific decisions are deferred to epoch-level AutoReject.
 
     Pipeline order:
-      1. Bad channel detection (MAD threshold={mad_threshold})
-      2. ICA fitting ({n_components*100:.0f}% variance) + ICLabel
-      3. Auto-exclusion of artifact components (>={artifact_threshold})
-      4. ICA application + bad channel interpolation + CAR + save
+      1. Drop specified channels (e.g., hardware reference)
+      2. Bad channel detection (MAD threshold={mad_threshold})
+      3. ICA fitting ({n_components*100:.0f}% variance) + ICLabel
+      4. Auto-exclusion of artifact components (>={artifact_threshold})
+      5. ICA application + bad channel interpolation + CAR + save
 
     Parameters
     ----------
@@ -285,6 +287,10 @@ def auto_preclean(
         Notch filter base Hz. Default 60.0.
     random_state : int
         Random seed for ICA.
+    drop_channels : list of str | None
+        Channel names to drop before cleaning. Use this to remove hardware
+        reference channels (e.g., ['Cz'] for BEL 280) that are redundant
+        after CAR. If None, no channels are dropped.
     overwrite : bool
         Overwrite existing output files.
 
@@ -296,8 +302,19 @@ def auto_preclean(
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    # Step 0: Drop specified channels (e.g., hardware reference)
+    if drop_channels:
+        existing = [ch for ch in drop_channels if ch in raw.ch_names]
+        if existing:
+            raw.drop_channels(existing)
+            logger.info("Dropped %d channel(s) before cleaning: %s", len(existing), existing)
+        missing = [ch for ch in drop_channels if ch not in raw.ch_names]
+        if missing:
+            logger.warning("Requested drop channels not found in data: %s", missing)
+
     logger.info("=" * 60)
     logger.info("Auto Pre-Clean: %s", subject_id)
+    logger.info("  Channels: %d", len(raw.ch_names))
     logger.info("  Filter: %.1f–%.1f Hz + %.0f Hz notch", highpass, lowpass, notch_freq)
     logger.info("  MAD: %.1f | ICA: %.0f%% var | ICLabel: %.2f",
                 mad_threshold, n_components * 100, artifact_threshold)
@@ -347,5 +364,5 @@ def auto_preclean(
         overwrite=overwrite,
     )
 
-    logger.info("Auto pre-clean complete: %s", output_path.name)
+    logger.info("Auto pre-clean complete: %s (%d channels)", output_path.name, len(cleaned.ch_names))
     return cleaned
