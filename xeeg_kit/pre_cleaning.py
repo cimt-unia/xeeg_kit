@@ -1,13 +1,16 @@
 # xeeg_kit/pre_cleaning.py
 
-"""Interactive pre-cleaning toolkit for BEL EEG data.
+"""Pre-cleaning toolkit for BEL EEG data.
 
-Provides modular functions for semi-automated artifact removal:
-1. Visualize and confirm bad channels using xeeg_kit anatomical maps.
-2. Fit ICA with ICLabel assistance and manually select components.
-3. Apply cleaning, interpolate, and save checkpoint for downstream pipelines.
+Provides two modes of operation:
 
-Designed to be used interactively in Jupyter/IPython environments.
+1. Interactive (Jupyter): inspect_bad_channels → fit_ica_with_labels →
+   apply_pre_cleaning. Designed for manual review and component selection.
+
+2. Automated conservative: auto_preclean. Single-call pipeline with high
+   thresholds for use before epoching. Only removes genuinely broken channels
+   and unambiguous artifacts; defers trial-specific decisions to epoch-level
+   AutoReject.
 """
 
 import logging
@@ -73,12 +76,10 @@ def inspect_bad_channels(
     )
     all_bads = sorted(set(auto_bads + (manual_bads or [])))
 
-    # Print anatomical summary to console
     map_df = load_bel_channel_map()
     summary = get_anatomical_summary(all_bads, map_df)
     logger.info("Bad channel candidates (%d):\n%s", len(all_bads), summary)
 
-    # Generate interactive 3D report
     out_dir = Path(output_dir) if output_dir else Path.cwd()
     out_dir.mkdir(parents=True, exist_ok=True)
     report_path = out_dir / f"{subject_id}_bad_channels_3d.html"
@@ -124,7 +125,6 @@ def fit_ica_with_labels(
     labels_dict : dict
         ICLabel output with keys 'labels' and 'y_pred_proba'.
     """
-    # Work on a filtered copy for ICA fitting
     raw_filt = raw.copy().load_data()
     raw_filt.filter(l_freq=highpass, h_freq=lowpass, picks="eeg", n_jobs=1, verbose=False)
     nyquist = raw_filt.info["sfreq"] / 2.0
@@ -133,7 +133,6 @@ def fit_ica_with_labels(
         raw_filt.notch_filter(freqs=notch_freqs, picks="eeg", method="fir", verbose=False)
     raw_filt._data = np.real(raw_filt._data).astype(np.float64)
 
-    # CAR is required for ICLabel
     raw_filt.set_eeg_reference("average", projection=False, verbose=False)
 
     logger.info("Fitting ICA (%.0f%% variance)...", n_components * 100)
@@ -147,11 +146,9 @@ def fit_ica_with_labels(
     ica.fit(raw_filt, picks="eeg")
     logger.info("ICA fitted: %d components.", ica.n_components_)
 
-    # Run ICLabel
     from mne_icalabel import label_components
     labels_dict = label_components(raw_filt, ica, method="iclabel")
 
-    # Log suggestions but do NOT auto-exclude
     logger.info("ICLabel classifications:")
     suggested_exclude = []
     for i, (label, prob_vec) in enumerate(
@@ -212,24 +209,143 @@ def apply_pre_cleaning(
     """
     cleaned = raw.copy().load_data()
 
-    # Mark bads and apply ICA
     cleaned.info["bads"] = list(bad_channels)
     logger.info("Applying ICA exclusion: %s", ica.exclude)
     cleaned = ica.apply(cleaned)
 
-    # Interpolate bad channels
     if interpolate_bads and cleaned.info["bads"]:
         cleaned.interpolate_bads(reset_bads=True)
         logger.info("Interpolated %d bad channels.", len(bad_channels))
 
-    # Re-apply average reference after interpolation
     cleaned.set_eeg_reference("average", projection=False, verbose=False)
     logger.info("Average reference applied.")
 
-    # Save checkpoint
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     cleaned.save(str(output_path), overwrite=overwrite, verbose=False)
     logger.info("Pre-cleaned data saved: %s", output_path)
 
+    return cleaned
+
+
+# ─── Automated Conservative Pre-Cleaning ─────────────────────────────────────
+
+CONSERVATIVE_MAD_THRESH: float = 50.0
+CONSERVATIVE_ARTIFACT_THRESH: float = 0.85
+CONSERVATIVE_ARTIFACT_CLASSES = {
+    "eye blink", "muscle artifact", "heart beat", "line noise", "channel noise",
+}
+
+
+def auto_preclean(
+    raw: mne.io.Raw,
+    output_dir: Path,
+    subject_id: str,
+    mad_threshold: float = CONSERVATIVE_MAD_THRESH,
+    artifact_threshold: float = CONSERVATIVE_ARTIFACT_THRESH,
+    n_components: float = 0.99,
+    highpass: float = DEFAULT_HIGHPASS,
+    lowpass: float = DEFAULT_LOWPASS,
+    notch_freq: float = DEFAULT_NOTCH,
+    random_state: int = 42,
+    overwrite: bool = True,
+) -> mne.io.Raw:
+    """Apply conservative automated pre-cleaning to full continuous data.
+
+    Single-call wrapper around inspect_bad_channels + fit_ica_with_labels +
+    apply_pre_cleaning with high thresholds. Designed for use BEFORE epoching.
+    Only genuinely broken channels and unambiguous artifacts are removed;
+    trial-specific decisions are deferred to epoch-level AutoReject.
+
+    Pipeline order:
+      1. Bad channel detection (MAD threshold={mad_threshold})
+      2. ICA fitting ({n_components*100:.0f}% variance) + ICLabel
+      3. Auto-exclusion of artifact components (>={artifact_threshold})
+      4. ICA application + bad channel interpolation + CAR + save
+
+    Parameters
+    ----------
+    raw : mne.io.Raw
+        Raw EEG data with montage already set.
+    output_dir : Path
+        Directory to save reports and cleaned FIF.
+    subject_id : str
+        Subject identifier for filenames.
+    mad_threshold : float
+        MAD z-score for bad channel detection. Default 50.0 (conservative).
+    artifact_threshold : float
+        ICLabel probability for auto-exclusion. Default 0.85.
+    n_components : float
+        Variance explained for ICA. Default 0.99.
+    highpass : float
+        High-pass filter Hz. Default 1.0.
+    lowpass : float
+        Low-pass filter Hz. Default 100.0.
+    notch_freq : float
+        Notch filter base Hz. Default 60.0.
+    random_state : int
+        Random seed for ICA.
+    overwrite : bool
+        Overwrite existing output files.
+
+    Returns
+    -------
+    cleaned_raw : mne.io.Raw
+        Conservatively pre-cleaned data ready for epoching.
+    """
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    logger.info("=" * 60)
+    logger.info("Auto Pre-Clean: %s", subject_id)
+    logger.info("  Filter: %.1f–%.1f Hz + %.0f Hz notch", highpass, lowpass, notch_freq)
+    logger.info("  MAD: %.1f | ICA: %.0f%% var | ICLabel: %.2f",
+                mad_threshold, n_components * 100, artifact_threshold)
+    logger.info("=" * 60)
+
+    # Step 1: Bad channel detection
+    bads = inspect_bad_channels(
+        raw,
+        mad_threshold=mad_threshold,
+        min_amplitude_uv=0.1,
+        manual_bads=None,
+        output_dir=output_dir,
+        subject_id=f"{subject_id}_autoclean",
+    )
+    raw.info["bads"] = bads
+
+    # Step 2: ICA + ICLabel
+    ica, labels = fit_ica_with_labels(
+        raw,
+        n_components=n_components,
+        highpass=highpass,
+        lowpass=lowpass,
+        notch_freq=notch_freq,
+        random_state=random_state,
+        eye_blink_thresh=artifact_threshold,
+    )
+
+    auto_exclude = [
+        i for i, (label, prob_vec) in enumerate(zip(labels["labels"], labels["y_pred_proba"]))
+        if label.lower().strip() in CONSERVATIVE_ARTIFACT_CLASSES
+        and np.max(prob_vec) > artifact_threshold
+    ]
+    logger.info("Auto-excluding %d components (>%.2f):", len(auto_exclude), artifact_threshold)
+    for i in auto_exclude:
+        logger.info("  IC%02d: %s (%.3f)", i, labels["labels"][i], np.max(labels["y_pred_proba"][i]))
+
+    ica.exclude = sorted(set(auto_exclude))
+
+    # Step 3: Apply cleaning
+    output_path = output_dir / f"{subject_id}_preclean_raw.fif"
+    cleaned = apply_pre_cleaning(
+        raw=raw,
+        ica=ica,
+        bad_channels=bads,
+        output_path=output_path,
+        interpolate_bads=True,
+        overwrite=overwrite,
+    )
+
+    logger.info("Auto pre-clean complete: %s", output_path.name)
     return cleaned
