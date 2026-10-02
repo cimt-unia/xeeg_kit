@@ -3,15 +3,17 @@
 BEL EEG epoch preprocessing pipeline.
 
 Epoch-level counterpart to bel_pipeline.py. Takes pre-epoched data (*_epo.fif),
-applies filtering, RANSAC, AutoReject, and optional ICA/ICLabel, then outputs
-cleaned epochs (*_epo_cleaned.fif) optimized for source estimation.
+applies RANSAC, AutoReject, and optional ICA/ICLabel, then outputs cleaned
+epochs (*_epo_cleaned.fif) optimized for source estimation.
+
+Filtering is NOT performed here. Data must be filtered on continuous raw
+before epoching to avoid edge artifacts at epoch boundaries.
 
 Pipeline order:
   1. Standardize (rename channels + apply GPSC montage)
-  2. High-pass filter (>= 1 Hz)
-  3. RANSAC (global bad channel detection via spatial prediction)
-  4. AutoReject (cross-validated per-trial repair + epoch rejection)
-  5. (Optional) ICA + ICLabel (stereotyped artifact removal)
+  2. RANSAC (global bad channel detection via spatial prediction)
+  3. AutoReject (cross-validated per-trial repair + epoch rejection)
+  4. (Optional) ICA + ICLabel (stereotyped artifact removal)
 """
 
 import logging
@@ -26,7 +28,6 @@ from .epoch_cleaning import (
     execute_autoreject,
     execute_icalabel_epochs,
     save_epoch_qc_report,
-    _apply_epoch_filters,
     DEFAULT_AR_N_INTERPOLATES,
     DEFAULT_AR_CONSENSUS_PERCS,
 )
@@ -50,7 +51,6 @@ def _process_single_bel_epoch_subject(
     out_path: Path,
     report_dir: Path,
     standardizer: BELStandardizer,
-    filter_params: Dict[str, Any],
     ransac_params: Dict[str, Any],
     autoreject_params: Dict[str, Any],
     use_ransac: bool,
@@ -61,8 +61,10 @@ def _process_single_bel_epoch_subject(
     verbose: bool,
 ) -> None:
     """Process a single subject's epoched data through the full pipeline."""
-    # 1. Load Epochs
+    # 1. Load Epochs (force full preload for EpochsFIF compatibility)
     epochs = mne.read_epochs(str(fif_path), preload=preload, verbose="WARNING")
+    if not epochs.preload:
+        epochs.load_data()
     logger.info(
         "Loaded: %d epochs, %d channels, %.1f Hz",
         len(epochs), len(epochs.ch_names), epochs.info['sfreq'],
@@ -81,17 +83,7 @@ def _process_single_bel_epoch_subject(
 
     subject_id = fif_path.stem.split("_")[0]
 
-    # 3. Filter (before AutoReject to prevent drift-triggered false rejections)
-    if verbose:
-        logger.info("Applying filters...")
-    _apply_epoch_filters(
-        epochs,
-        highpass=filter_params.get('highpass', 1.0),
-        lowpass=filter_params.get('lowpass', 100.0),
-        notch_freq=filter_params.get('notch_freq', 60.0),
-    )
-
-    # 4. RANSAC (global bad channel detection)
+    # 3. RANSAC (global bad channel detection)
     if use_ransac:
         if verbose:
             logger.info("Running RANSAC...")
@@ -112,7 +104,7 @@ def _process_single_bel_epoch_subject(
     elif verbose:
         logger.info("RANSAC skipped (use_ransac=False).")
 
-    # 5. AutoReject (per-trial repair + epoch rejection)
+    # 4. AutoReject (per-trial repair + epoch rejection)
     if verbose:
         logger.info("Running AutoReject...")
     epochs_clean, reject_log = execute_autoreject(
@@ -126,24 +118,24 @@ def _process_single_bel_epoch_subject(
         verbose=verbose,
     )
 
-    # 6. Optional: ICA + ICLabel
+    # 5. Optional: ICA + ICLabel
     if use_icalabel:
         if verbose:
             logger.info("Running ICA + ICLabel...")
         epochs_clean = execute_icalabel_epochs(
             epochs_clean,
             icalabel_thresholds=icalabel_params.get('icalabel_thresholds'),
-            n_components=icalabel_params.get('n_components', 0.95),
+            n_components=icalabel_params.get('n_components', 0.99),
             random_state=icalabel_params.get('random_state', 42),
             verbose=verbose,
         )
 
-    # 7. Save
+    # 6. Save
     out_path.parent.mkdir(parents=True, exist_ok=True)
     epochs_clean.save(str(out_path), overwrite=overwrite, verbose="WARNING")
     logger.info("Saved cleaned epochs: %s (%d trials)", out_path.name, len(epochs_clean))
 
-    # 8. QC Report
+    # 7. QC Report
     save_epoch_qc_report(reject_log, report_dir, f"{subject_id}_autoreject")
 
 
@@ -151,7 +143,6 @@ def preprocess_bel_epochs(
     data_dir: Path,
     output_dir: Path,
     gpsc_path: Optional[Path] = None,
-    filter_params: Optional[Dict[str, Any]] = None,
     ransac_params: Optional[Dict[str, Any]] = None,
     autoreject_params: Optional[Dict[str, Any]] = None,
     use_ransac: bool = True,
@@ -165,6 +156,15 @@ def preprocess_bel_epochs(
 ) -> Dict[str, Path]:
     """Batch process epoched BEL EEG data through the full cleaning pipeline.
 
+    Filtering is NOT performed here. Apply filters to continuous raw data
+    before epoching to avoid edge artifacts at epoch boundaries.
+
+    Pipeline order:
+      1. Standardize (rename channels + apply GPSC montage)
+      2. RANSAC (global bad channel detection via spatial prediction)
+      3. AutoReject (cross-validated per-trial repair + epoch rejection)
+      4. (Optional) ICA + ICLabel (stereotyped artifact removal)
+
     Parameters
     ----------
     data_dir : Path
@@ -173,12 +173,12 @@ def preprocess_bel_epochs(
         Directory to save cleaned *_epo_cleaned.fif files.
     gpsc_path : Path | None
         Path to GPSC file. If None, uses bundled default.
-    filter_params : dict | None
-        Filtering parameters: highpass, lowpass, notch_freq.
     ransac_params : dict | None
-        RANSAC parameters: n_resample, min_channels, min_corr, unbroken_time, n_jobs, random_state.
+        RANSAC parameters: n_resample, min_channels, min_corr,
+        unbroken_time, n_jobs, random_state.
     autoreject_params : dict | None
-        AutoReject parameters: n_interpolates, consensus_percs, thresh_method, cv, random_state, n_jobs.
+        AutoReject parameters: n_interpolates, consensus_percs,
+        thresh_method, cv, random_state, n_jobs.
     use_ransac : bool
         Run RANSAC before AutoReject. Default True.
     use_icalabel : bool
@@ -233,7 +233,6 @@ def preprocess_bel_epochs(
             out_path=out_path,
             report_dir=report_dir,
             standardizer=standardizer,
-            filter_params=filter_params or {},
             ransac_params=ransac_params or {},
             autoreject_params=autoreject_params or {},
             use_ransac=use_ransac,
