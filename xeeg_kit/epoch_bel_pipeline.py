@@ -91,16 +91,19 @@ def _process_single_bel_epoch_subject(
             epochs,
             n_resample=ransac_params.get('n_resample', 50),
             min_channels=ransac_params.get('min_channels', 0.25),
-            min_corr=ransac_params.get('min_corr', 0.75),
-            unbroken_time=ransac_params.get('unbroken_time', 0.4),
-            n_jobs=ransac_params.get('n_jobs', 1),
+            min_corr=ransac_params.get('min_corr', 0.30),
+            unbroken_time=ransac_params.get('unbroken_time', 0.99),
+            n_jobs=ransac_params.get('n_jobs', -1),
             random_state=ransac_params.get('random_state', 42),
             generate_report=True,
             report_dir=report_dir,
             subject_id=f"{subject_id}_ransac",
             verbose=verbose,
         )
-        epochs.info['bads'] = ransac_bads
+        # NOTE: We intentionally DO NOT set epochs.info['bads'] = ransac_bads here.
+        # execute_ransac already interpolated these channels and cleared the bads
+        # list so that AutoReject includes ALL channels in CV threshold learning.
+        
     elif verbose:
         logger.info("RANSAC skipped (use_ransac=False).")
 
@@ -114,7 +117,7 @@ def _process_single_bel_epoch_subject(
         thresh_method=autoreject_params.get('thresh_method', 'bayesian_optimization'),
         cv=autoreject_params.get('cv', 10),
         random_state=autoreject_params.get('random_state', 42),
-        n_jobs=autoreject_params.get('n_jobs', 1),
+        n_jobs=autoreject_params.get('n_jobs', -1),
         verbose=verbose,
     )
 
@@ -154,53 +157,7 @@ def preprocess_bel_epochs(
     overwrite: bool = True,
     verbose: bool = False,
 ) -> Dict[str, Path]:
-    """Batch process epoched BEL EEG data through the full cleaning pipeline.
-
-    Filtering is NOT performed here. Apply filters to continuous raw data
-    before epoching to avoid edge artifacts at epoch boundaries.
-
-    Pipeline order:
-      1. Standardize (rename channels + apply GPSC montage)
-      2. RANSAC (global bad channel detection via spatial prediction)
-      3. AutoReject (cross-validated per-trial repair + epoch rejection)
-      4. (Optional) ICA + ICLabel (stereotyped artifact removal)
-
-    Parameters
-    ----------
-    data_dir : Path
-        Directory containing input *_epo.fif files.
-    output_dir : Path
-        Directory to save cleaned *_epo_cleaned.fif files.
-    gpsc_path : Path | None
-        Path to GPSC file. If None, uses bundled default.
-    ransac_params : dict | None
-        RANSAC parameters: n_resample, min_channels, min_corr,
-        unbroken_time, n_jobs, random_state.
-    autoreject_params : dict | None
-        AutoReject parameters: n_interpolates, consensus_percs,
-        thresh_method, cv, random_state, n_jobs.
-    use_ransac : bool
-        Run RANSAC before AutoReject. Default True.
-    use_icalabel : bool
-        Run ICA + ICLabel after AutoReject. Default False.
-    icalabel_params : dict | None
-        ICLabel parameters: icalabel_thresholds, n_components, random_state.
-    pattern : str
-        Glob pattern for input files. Default "*_epo.fif".
-    rename_map : dict | None
-        Channel renaming dictionary. If None, uses BEL 280 default.
-    preload : bool
-        Preload data into memory. Default True.
-    overwrite : bool
-        Overwrite existing outputs. Default True.
-    verbose : bool
-        Enable detailed logging. Default False.
-
-    Returns
-    -------
-    saved_paths : dict
-        Mapping of original filenames to cleaned output paths.
-    """
+    """Batch process epoched BEL EEG data through the full cleaning pipeline."""
     if verbose:
         logging.basicConfig(level=logging.INFO, format="[%(asctime)s] %(message)s", datefmt="%H:%M:%S")
 
