@@ -26,7 +26,16 @@ from .pre_cleaning import (
     apply_pre_cleaning,
 )
 
+# Epoch-level cleaning pipeline (autoreject + RANSAC + ICLabel)
+from .epoch_cleaning import (
+    execute_ransac,
+    execute_autoreject,
+    execute_icalabel_epochs,
+    save_epoch_qc_report,
+)
+from .epoch_bel_pipeline import preprocess_bel_epochs, DEFAULT_EPOCH_PATTERN
+
 create_bel_channel_map = load_bel_channel_map
 
-__version__ = "0.2.0"
+__version__ = "0.2.0" 
 __author__ = "CIMT"
