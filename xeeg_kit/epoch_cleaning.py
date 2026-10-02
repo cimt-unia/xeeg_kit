@@ -2,6 +2,8 @@
 """
 Epoch-level artifact cleaning: RANSAC, AutoReject, and ICLabel-based ICA.
 
+Filtering is NOT performed here. Data must be filtered on continuous
+raw before epoching to avoid edge artifacts at epoch boundaries.
 """
 
 import logging
@@ -30,9 +32,6 @@ from .viz import get_anatomical_summary, plot_bad_channels_3d, load_bel_channel_
 logger = logging.getLogger(__name__)
 
 # ─── Default Parameters ──────────────────────────────────────────────────────
-DEFAULT_HIGHPASS = 1.0
-DEFAULT_LOWPASS = 100.0
-DEFAULT_NOTCH = 60.0
 DEFAULT_ICA_COMP = 0.99
 DEFAULT_ICA_SEED = 42
 DEFAULT_ICALABEL_THRESH = 0.85
@@ -47,25 +46,6 @@ DEFAULT_RANSAC_N_RESAMPLE = 50
 DEFAULT_RANSAC_MIN_CHANNELS = 0.25
 DEFAULT_RANSAC_MIN_CORR = 0.75
 DEFAULT_RANSAC_UNBROKEN_TIME = 0.4
-
-
-def _apply_epoch_filters(
-    epochs: mne.Epochs,
-    highpass: float,
-    lowpass: Optional[float],
-    notch_freq: Optional[float],
-) -> None:
-    """Apply bandpass and notch filters to epoched data."""
-    epochs.filter(l_freq=highpass, h_freq=lowpass, picks='eeg', n_jobs=1, verbose=False)
-    if notch_freq is not None:
-        nyquist = epochs.info['sfreq'] / 2.0
-        max_f = min(lowpass or np.inf, nyquist)
-        freqs = [f for f in [notch_freq, notch_freq * 2.0] if f <= max_f]
-        if freqs:
-            epochs.notch_filter(
-                freqs=freqs, picks='eeg', method='fir',
-                filter_length='auto', n_jobs=1, verbose=False,
-            )
 
 
 def _generate_bad_channel_report(
@@ -109,7 +89,7 @@ def execute_ransac(
     Parameters
     ----------
     epochs : mne.Epochs
-        Epoched data with montage set.
+        Epoched data with montage set. Must be preloaded.
     n_resample : int
         Number of random channel subsets to draw.
     min_channels : float
@@ -140,6 +120,8 @@ def execute_ransac(
     """
     if not HAS_AUTOREJECT:
         raise ImportError("The 'autoreject' package is required. Install via 'pip install autoreject'.")
+    if not epochs.preload:
+        raise ValueError("Epochs must be preloaded for RANSAC.")
     if epochs.get_montage() is None:
         raise ValueError("Epochs must have a montage set for RANSAC interpolation.")
 
@@ -189,7 +171,7 @@ def execute_autoreject(
     Parameters
     ----------
     epochs : mne.Epochs
-        Epoched data (ideally after RANSAC and filtering).
+        Epoched data (ideally after RANSAC). Must be preloaded.
     n_interpolates : array-like | None
         Candidate values for rho (max channels to interpolate per trial).
     consensus_percs : array-like | None
@@ -256,7 +238,8 @@ def execute_icalabel_epochs(
     """Fit and apply ICLabel-based ICA on epoched data.
 
     Best results when run AFTER an initial AutoReject pass. Enforces
-    minimum highpass and re-applies CAR before ICA fitting.
+    minimum highpass (must be applied to raw before epoching) and
+    re-applies CAR before ICA fitting.
 
     Parameters
     ----------
@@ -284,8 +267,9 @@ def execute_icalabel_epochs(
 
     if epochs.info.get('highpass') is None or epochs.info['highpass'] < MIN_HIGHPASS_FOR_ICA:
         raise ValueError(
-            f"Data must be high-pass filtered at >= {MIN_HIGHPASS_FOR_ICA} Hz before ICA. "
-            f"Current highpass: {epochs.info.get('highpass')}"
+            f"Data must be high-pass filtered at >= {MIN_HIGHPASS_FOR_ICA} Hz before epoching. "
+            f"Current highpass: {epochs.info.get('highpass')}. "
+            "Apply filters to continuous raw before creating epochs."
         )
 
     if icalabel_thresholds is None:
