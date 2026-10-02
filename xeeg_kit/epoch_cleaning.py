@@ -42,10 +42,14 @@ DEFAULT_AR_CONSENSUS_PERCS = np.linspace(0.0, 1.0, 11)
 DEFAULT_AR_THRESH_METHOD = "bayesian_optimization"
 DEFAULT_AR_CV = 10
 
+# Conservative RANSAC defaults for high-density EEG (280-ch BEL).
+# min_corr=0.30: only flag channels with near-zero spatial predictability.
+# unbroken_time=0.99: must fail in virtually ALL epochs to be flagged globally.
+# These are designed to complement continuous MAD pre-cleaning, not replace it.
 DEFAULT_RANSAC_N_RESAMPLE = 50
 DEFAULT_RANSAC_MIN_CHANNELS = 0.25
-DEFAULT_RANSAC_MIN_CORR = 0.75
-DEFAULT_RANSAC_UNBROKEN_TIME = 0.4
+DEFAULT_RANSAC_MIN_CORR = 0.30
+DEFAULT_RANSAC_UNBROKEN_TIME = 0.99
 
 
 def _generate_bad_channel_report(
@@ -84,7 +88,9 @@ def execute_ransac(
 
     Interpolates each channel from random subsets of neighbors and flags
     channels whose predicted signal consistently fails to correlate with
-    the observed signal across epochs.
+    the observed signal across epochs. After interpolation, clears
+    epochs.info['bads'] so that downstream AutoReject includes ALL channels
+    in its per-channel CV threshold learning.
 
     Parameters
     ----------
@@ -114,9 +120,9 @@ def execute_ransac(
     Returns
     -------
     epochs_clean : mne.Epochs
-        Epochs with globally bad channels interpolated.
+        Epochs with globally bad channels interpolated and bads list cleared.
     bad_chs : list of str
-        List of RANSAC-detected bad channel names.
+        List of RANSAC-detected bad channel names (before clearing).
     """
     if not HAS_AUTOREJECT:
         raise ImportError("The 'autoreject' package is required. Install via 'pip install autoreject'.")
@@ -148,6 +154,17 @@ def execute_ransac(
         r_dir = Path(report_dir) if report_dir else Path.cwd()
         r_dir.mkdir(parents=True, exist_ok=True)
         _generate_bad_channel_report(bad_chs, r_dir, f"{subject_id}_ransac", epochs)
+
+    # Clear bads list so AutoReject includes ALL channels in CV threshold learning.
+    # Without this, AutoReject ignores RANSAC-interpolated channels entirely
+    # (see autoreject/utils.py _check_data warning).
+    epochs_clean.info['bads'] = []
+    if verbose and bad_chs:
+        logger.info(
+            "Cleared bads list after RANSAC interpolation. "
+            "%d channels now available for AutoReject.",
+            len(epochs_clean.ch_names),
+        )
 
     return epochs_clean, bad_chs
 
