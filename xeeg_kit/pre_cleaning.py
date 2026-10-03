@@ -1,5 +1,4 @@
 # xeeg_kit/pre_cleaning.py
-
 """Pre-cleaning toolkit for BEL EEG data.
 
 Provides two modes of operation:
@@ -8,9 +7,9 @@ Provides two modes of operation:
    apply_pre_cleaning. Designed for manual review and component selection.
 
 2. Automated conservative: auto_preclean. Single-call pipeline with high
-   thresholds for use before epoching. Only removes genuinely broken channels
-   and unambiguous artifacts; defers trial-specific decisions to epoch-level
-   AutoReject.
+   thresholds for use before epoching. Filters real data first, then removes
+   genuinely broken channels and unambiguous artifacts; defers trial-specific
+   decisions to downstream MEEGKit cleaning on concatenated epochs.
 """
 
 import logging
@@ -53,7 +52,8 @@ def inspect_bad_channels(
     Parameters
     ----------
     raw : mne.io.Raw
-        Raw EEG data with montage already set.
+        Raw EEG data with montage already set. Should be filtered before
+        calling this function to avoid drift-inflated MAD scores.
     mad_threshold : float
         MAD z-score threshold for noisy channel detection.
     min_amplitude_uv : float
@@ -96,13 +96,14 @@ def fit_ica_with_labels(
     lowpass: float = DEFAULT_LOWPASS,
     notch_freq: float = DEFAULT_NOTCH,
     random_state: int = 42,
-    eye_blink_thresh: float = DEFAULT_ICALABEL_THRESH,
 ) -> Tuple[mne.preprocessing.ICA, Dict]:
-    """Filter data, fit ICA, and run ICLabel to assist manual component selection.
+    """Filter data, fit ICA, and run ICLabel.
 
-    This function does NOT exclude any components automatically (except
-    suggesting eye blinks). You inspect the results and set ``ica.exclude``
-    yourself before calling ``apply_pre_cleaning``.
+    For interactive use: filters an internal copy, fits ICA, returns labels
+    for manual inspection. Does NOT log per-component classifications.
+
+    For automated use (auto_preclean): safe to call on already-filtered data;
+    internal filtering is harmless/idempotent.
 
     Parameters
     ----------
@@ -114,9 +115,6 @@ def fit_ica_with_labels(
         Filter parameters required for valid ICLabel classification.
     random_state : int
         Random seed for ICA reproducibility.
-    eye_blink_thresh : float
-        Probability threshold above which eye blink components are
-        *suggested* for exclusion (logged but NOT auto-excluded).
 
     Returns
     -------
@@ -148,27 +146,6 @@ def fit_ica_with_labels(
 
     from mne_icalabel import label_components
     labels_dict = label_components(raw_filt, ica, method="iclabel")
-
-    logger.info("ICLabel classifications:")
-    suggested_exclude = []
-    for i, (label, prob_vec) in enumerate(
-        zip(labels_dict["labels"], labels_dict["y_pred_proba"])
-    ):
-        max_prob = np.max(prob_vec)
-        marker = ""
-        if label.lower().strip() == "eye blink" and max_prob > eye_blink_thresh:
-            suggested_exclude.append(i)
-            marker = " <-- SUGGESTED EXCLUDE"
-        logger.info("  IC%02d: %-20s %.3f%s", i, label, max_prob, marker)
-
-    if suggested_exclude:
-        logger.info(
-            "Suggested eye-blink exclusions: %s. "
-            "Review with ica.plot_sources() and set ica.exclude manually.",
-            suggested_exclude,
-        )
-    else:
-        logger.info("No eye-blink components exceeded threshold %.2f.", eye_blink_thresh)
 
     return ica, labels_dict
 
@@ -253,17 +230,13 @@ def auto_preclean(
 ) -> mne.io.Raw:
     """Apply conservative automated pre-cleaning to full continuous data.
 
-    Single-call wrapper around inspect_bad_channels + fit_ica_with_labels +
-    apply_pre_cleaning with high thresholds. Designed for use BEFORE epoching.
-    Only genuinely broken channels and unambiguous artifacts are removed;
-    trial-specific decisions are deferred to epoch-level AutoReject.
-
     Pipeline order:
       1. Drop specified channels (e.g., hardware reference)
-      2. Bad channel detection (MAD threshold={mad_threshold})
-      3. ICA fitting ({n_components*100:.0f}% variance) + ICLabel
-      4. Auto-exclusion of artifact components (>={artifact_threshold})
-      5. ICA application + bad channel interpolation + CAR + save
+      2. Filter real data (highpass + lowpass + notch) ← APPLIED TO SAVED OUTPUT
+      3. Bad channel detection (MAD on filtered data)
+      4. ICA fitting + ICLabel (on already-filtered data)
+      5. Auto-exclusion of artifact components
+      6. ICA application + bad channel interpolation + CAR + save
 
     Parameters
     ----------
@@ -297,7 +270,7 @@ def auto_preclean(
     Returns
     -------
     cleaned_raw : mne.io.Raw
-        Conservatively pre-cleaned data ready for epoching.
+        Conservatively pre-cleaned and filtered data ready for epoching.
     """
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -312,15 +285,24 @@ def auto_preclean(
         if missing:
             logger.warning("Requested drop channels not found in data: %s", missing)
 
+    # Step 1: Filter REAL data before MAD and ICA
+    logger.info("Applying filters: %.1f–%.1f Hz + %.0f Hz notch", highpass, lowpass, notch_freq)
+    raw.filter(l_freq=highpass, h_freq=lowpass, picks="eeg", n_jobs=1, verbose=False)
+    nyquist = raw.info["sfreq"] / 2.0
+    notch_freqs = [f for f in [notch_freq, notch_freq * 2.0] if f <= min(lowpass, nyquist)]
+    if notch_freqs:
+        raw.notch_filter(freqs=notch_freqs, picks="eeg", method="fir", verbose=False)
+    raw._data = np.real(raw._data).astype(np.float64)
+
     logger.info("=" * 60)
     logger.info("Auto Pre-Clean: %s", subject_id)
     logger.info("  Channels: %d", len(raw.ch_names))
-    logger.info("  Filter: %.1f–%.1f Hz + %.0f Hz notch", highpass, lowpass, notch_freq)
+    logger.info("  Filter: %.1f–%.1f Hz + %.0f Hz notch (applied)", highpass, lowpass, notch_freq)
     logger.info("  MAD: %.1f | ICA: %.0f%% var | ICLabel: %.2f",
                 mad_threshold, n_components * 100, artifact_threshold)
     logger.info("=" * 60)
 
-    # Step 1: Bad channel detection
+    # Step 2: Bad channel detection (now on filtered data)
     bads = inspect_bad_channels(
         raw,
         mad_threshold=mad_threshold,
@@ -331,7 +313,7 @@ def auto_preclean(
     )
     raw.info["bads"] = bads
 
-    # Step 2: ICA + ICLabel
+    # Step 3: ICA + ICLabel (data already filtered; internal copy filtering is harmless)
     ica, labels = fit_ica_with_labels(
         raw,
         n_components=n_components,
@@ -339,9 +321,9 @@ def auto_preclean(
         lowpass=lowpass,
         notch_freq=notch_freq,
         random_state=random_state,
-        eye_blink_thresh=artifact_threshold,
     )
 
+    # Auto-exclude artifacts above threshold
     auto_exclude = [
         i for i, (label, prob_vec) in enumerate(zip(labels["labels"], labels["y_pred_proba"]))
         if label.lower().strip() in CONSERVATIVE_ARTIFACT_CLASSES
@@ -353,7 +335,7 @@ def auto_preclean(
 
     ica.exclude = sorted(set(auto_exclude))
 
-    # Step 3: Apply cleaning
+    # Step 4: Apply cleaning
     output_path = output_dir / f"{subject_id}_preclean_raw.fif"
     cleaned = apply_pre_cleaning(
         raw=raw,
