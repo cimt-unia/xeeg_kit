@@ -213,7 +213,6 @@ CONSERVATIVE_ARTIFACT_CLASSES = {
     "eye blink", "muscle artifact", "heart beat", "line noise", "channel noise",
 }
 
-
 def auto_preclean(
     raw: mne.io.Raw,
     output_dir: Path,
@@ -231,17 +230,18 @@ def auto_preclean(
     """Apply conservative automated pre-cleaning to full continuous data.
 
     Pipeline order:
-      1. Drop specified channels (e.g., hardware reference)
-      2. Filter real data (highpass + lowpass + notch) ← APPLIED TO SAVED OUTPUT
-      3. Bad channel detection (MAD on filtered data)
-      4. ICA fitting + ICLabel (on already-filtered data)
-      5. Auto-exclusion of artifact components
-      6. ICA application + bad channel interpolation + CAR + save
+      0. Drop specified channels (e.g., hardware reference + jaw)
+      1. Filter real data (highpass + lowpass + notch) ← APPLIED TO SAVED OUTPUT
+      2. Bad channel detection (MAD on filtered data)
+      3. ICA fitting + ICLabel (on already-filtered data)
+      4. Auto-exclusion of artifact components
+      5. ICA application + bad channel interpolation + CAR + save
 
     Parameters
     ----------
     raw : mne.io.Raw
-        Raw EEG data with montage already set.
+        Raw EEG data with montage already set. Must be standardized
+        (e.g., via BELStandardizer) BEFORE calling this function.
     output_dir : Path
         Directory to save reports and cleaned FIF.
     subject_id : str
@@ -262,8 +262,9 @@ def auto_preclean(
         Random seed for ICA.
     drop_channels : list of str | None
         Channel names to drop before cleaning. Use this to remove hardware
-        reference channels (e.g., ['Cz'] for BEL 280) that are redundant
-        after CAR. If None, no channels are dropped.
+        reference channels (e.g., ['Cz'] for BEL 280) and non-neural sensors
+        (e.g., jaw EMG channels) that are redundant after CAR. If None, no
+        channels are dropped.
     overwrite : bool
         Overwrite existing output files.
 
@@ -271,19 +272,36 @@ def auto_preclean(
     -------
     cleaned_raw : mne.io.Raw
         Conservatively pre-cleaned and filtered data ready for epoching.
+
+    Raises
+    ------
+    RuntimeError
+        If ALL requested drop_channels are missing from raw.ch_names,
+        indicating that BELStandardizer.standardize() was likely not called.
     """
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Step 0: Drop specified channels (e.g., hardware reference)
+    # Step 0: Drop specified channels (e.g., hardware reference + jaw)
     if drop_channels:
+        # FIX: Compute BOTH lists BEFORE mutating raw.ch_names via drop_channels()
         existing = [ch for ch in drop_channels if ch in raw.ch_names]
+        missing = [ch for ch in drop_channels if ch not in raw.ch_names]
+
         if existing:
             raw.drop_channels(existing)
             logger.info("Dropped %d channel(s) before cleaning: %s", len(existing), existing)
-        missing = [ch for ch in drop_channels if ch not in raw.ch_names]
+
         if missing:
-            logger.warning("Requested drop channels not found in data: %s", missing)
+            # Fail hard if ALL requested channels are missing (likely un-standardized data)
+            if len(missing) == len(drop_channels):
+                raise RuntimeError(
+                    f"NONE of the requested drop_channels were found in data. "
+                    f"Requested: {drop_channels}. "
+                    f"Available (first 10): {raw.ch_names[:10]}. "
+                    f"Ensure BELStandardizer.standardize() was called before auto_preclean()."
+                )
+            logger.warning("Some requested drop channels not found: %s", missing)
 
     # Step 1: Filter REAL data before MAD and ICA
     logger.info("Applying filters: %.1f–%.1f Hz + %.0f Hz notch", highpass, lowpass, notch_freq)
